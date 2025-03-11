@@ -6,7 +6,7 @@ from io import BytesIO
 import cairosvg
 
 # 设置 Deepbricks 中介的 API 密钥和基础 URL
-API_KEY = "YOUR_API_KEY"  # 请妥善保管密钥，不要在公开场合直接暴露
+API_KEY = "sk-lNVAREVHjj386FDCd9McOL7k66DZCUkTp6IbV0u9970qqdlg"  # 请妥善保管密钥，不要在公开场合直接暴露
 BASE_URL = "https://api.deepbricks.ai/v1/"
 
 # 初始化 OpenAI 客户端
