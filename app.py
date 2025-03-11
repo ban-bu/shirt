@@ -6,7 +6,7 @@ from io import BytesIO
 import cairosvg
 
 # 设置 Deepbricks 中介的 API 密钥和基础 URL
-API_KEY = "sk-KACPocnavR6poutXUaj7HxsqUrxvcV808S2bv0U9974Ec83g"  # 请妥善保管密钥
+API_KEY = "YOUR_API_KEY"  # 请妥善保管密钥，不要在公开场合直接暴露
 BASE_URL = "https://api.deepbricks.ai/v1/"
 
 # 初始化 OpenAI 客户端
@@ -15,7 +15,7 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 def generate_vector_image(prompt):
     """
     根据提示词调用 Deepbricks 接口生成图像，判断响应是否为 SVG（矢量图），
-    如是 SVG则转换为 PNG，否则直接返回位图 Image 对象。
+    如果是 SVG 则转换为 PNG，否则直接返回位图 Image 对象。
     """
     try:
         resp = client.images.generate(
@@ -37,6 +37,7 @@ def generate_vector_image(prompt):
             if image_resp.status_code == 200:
                 content_type = image_resp.headers.get("Content-Type", "")
                 if "svg" in content_type.lower():
+                    # 如果是 SVG，则先转换为 PNG
                     try:
                         png_data = cairosvg.svg2png(bytestring=image_resp.content)
                         return Image.open(BytesIO(png_data))
@@ -44,6 +45,7 @@ def generate_vector_image(prompt):
                         st.error(f"SVG 转 PNG 时出错: {conv_err}")
                         return None
                 else:
+                    # 否则直接读取为位图
                     return Image.open(BytesIO(image_resp.content))
             else:
                 st.error(f"下载图像失败，状态码：{image_resp.status_code}")
@@ -74,22 +76,26 @@ if st.button("生成定制衣服设计"):
         if custom_design:
             # 获取白衬衫图片尺寸
             shirt_w, shirt_h = shirt_image.size
-            # 将生成的设计图调整为白衬衫宽度的 50%
-            design_w = int(shirt_w * 0.5)
+            # 将生成的设计图调整为白衬衫宽度的 30%，让图案更小
+            scale_ratio = 0.3
+            design_w = int(shirt_w * scale_ratio)
             design_ratio = custom_design.width / custom_design.height
             design_h = int(design_w / design_ratio)
+
+            # 调整图案尺寸
             custom_design = custom_design.resize((design_w, design_h), Image.LANCZOS)
             
-            # 计算将设计图置于白衬衫正中间的位置
+            # 计算将图案贴在衬衫正中间的位置
             pos_x = (shirt_w - design_w) // 2
             pos_y = (shirt_h - design_h) // 2
             
             # 创建副本进行图像合成
             composite_image = shirt_image.copy()
             try:
-                # 尝试使用设计图透明通道作为蒙版进行粘贴
+                # 如果图案支持透明通道，则使用其作为蒙版进行粘贴
                 composite_image.paste(custom_design, (pos_x, pos_y), custom_design)
             except Exception as e:
+                # 如果失败，则直接粘贴
                 st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
                 composite_image.paste(custom_design, (pos_x, pos_y))
                 
