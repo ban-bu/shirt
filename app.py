@@ -32,7 +32,7 @@ def generate_image_with_openai(prompt):
 st.title("个性化定制衣服生成系统")
 
 # 上传白衬衫图片
-shirt_image = Image.open('assets/white_shirt.png')
+shirt_image = Image.open('white_shirt.png')
 st.sidebar.image(shirt_image, caption="基础白衬衫", use_column_width=True)
 
 # 输入框：让消费者输入提示词
