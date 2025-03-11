@@ -78,13 +78,13 @@ if st.button("生成定制衣服设计"):
             design_w = int(shirt_w * 0.5)
             design_ratio = custom_design.width / custom_design.height
             design_h = int(design_w / design_ratio)
-            custom_design = custom_design.resize((design_w, design_h), Image.ANTIALIAS)
+            custom_design = custom_design.resize((design_w, design_h), Image.LANCZOS)
             
             # 计算将设计图置于白衬衫正中间的位置
             pos_x = (shirt_w - design_w) // 2
             pos_y = (shirt_h - design_h) // 2
             
-            # 复制白衬衫图像，进行图像合成
+            # 创建副本进行图像合成
             composite_image = shirt_image.copy()
             try:
                 # 尝试使用设计图透明通道作为蒙版进行粘贴
