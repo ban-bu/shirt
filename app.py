@@ -12,7 +12,7 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 # 函数：根据提示词生成图像
 def generate_image_with_openai(prompt):
     completion = client.chat.completions.create(
-        model="GPT-4o",
+        model="dall-e-3",
         messages=[
             {
                 "role": "user",
