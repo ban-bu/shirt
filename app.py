@@ -235,9 +235,6 @@ with col1:
             )]
             st.rerun()
     
-    # 显示当前图像
-    st.image(st.session_state.current_image, use_column_width=True)
-    
     # 显示已选择的区域状态
     if st.session_state.selection_areas:
         st.markdown("**✅ 已选择区域**")
