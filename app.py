@@ -94,8 +94,8 @@ def draw_selection_box(image, start_point):
     img_copy = image.copy()
     draw = ImageDraw.Draw(img_copy)
     
-    # 固定框的大小
-    box_size = 1024
+    # 固定框的大小 (1024 * 0.3)
+    box_size = int(1024 * 0.3)
     
     # 计算结束点（基于固定大小）
     x1, y1 = start_point
@@ -132,7 +132,7 @@ def draw_selection_box(image, start_point):
 def get_selection_coordinates(start_point):
     """获取固定大小选择框的坐标和尺寸"""
     x1, y1 = start_point
-    box_size = 1024
+    box_size = int(1024 * 0.3)
     
     return (x1, y1, box_size, box_size)
 
@@ -195,30 +195,23 @@ with col1:
         # 更新当前鼠标位置的选择框
         temp_image = st.session_state.base_image.copy()
         
-        # 绘制已有的选择区域
-        for area in st.session_state.selection_areas:
-            left, top, width, height = area
-            area_start = (left, top)
-            temp_image = draw_selection_box(temp_image, area_start)
-        
         # 绘制当前跟随鼠标的选择框
         current_point = (coordinates["x"], coordinates["y"])
         temp_image = draw_selection_box(temp_image, current_point)
         
         st.session_state.current_image = temp_image
         
-        # 当点击时添加选择区域
-        if st.button("📌 固定当前选择区域"):
-            selection = get_selection_coordinates(current_point)
-            st.session_state.selection_areas.append(selection)
+        # 当点击时添加/更新选择区域
+        if st.button("📌 确认选择区域"):
+            st.session_state.selection_areas = [get_selection_coordinates(current_point)]  # 只保留一个区域
             st.rerun()
     
-    # 显示已选择的区域数量
+    # 显示已选择的区域状态
     if st.session_state.selection_areas:
-        st.markdown(f"**已选择 {len(st.session_state.selection_areas)} 个区域**")
+        st.markdown("**✅ 已选择区域**")
         
         # 清除选择按钮
-        if st.button("🗑️ 清除所有选择区域"):
+        if st.button("🗑️ 清除选择区域"):
             st.session_state.selection_areas = []
             st.session_state.current_image = st.session_state.base_image.copy()
             st.rerun()
