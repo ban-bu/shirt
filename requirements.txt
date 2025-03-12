@@ -5,3 +5,4 @@ requests
 Pillow
 cairosvg
 numpy
+streamlit_image_coordinates
