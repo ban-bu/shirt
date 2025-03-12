@@ -90,36 +90,36 @@ def generate_vector_image(prompt):
 
 def draw_selection_box(image, start_point, end_point):
     """在图像上绘制选择框"""
-    # Create a copy of the image to avoid modifying the original
+    # 创建图像副本以避免修改原始图像
     img_copy = image.copy()
     draw = ImageDraw.Draw(img_copy)
     
-    # Ensure coordinates are properly formatted for rectangle drawing
+    # 确保坐标格式正确
     x1, y1 = start_point
     x2, y2 = end_point
     
-    # Draw the outline with proper coordinates
-    draw.rectangle(
-        [(x1, y1), (x2, y2)],
-        outline=(255, 0, 0),  # Red outline
-        width=3
-    )
+    # 绘制轮廓 - 不使用width参数，而是绘制多个矩形来模拟粗线条
+    for i in range(3):  # 绘制3像素宽的边框
+        draw.rectangle(
+            [(x1-i, y1-i), (x2+i, y2+i)],
+            outline=(255, 0, 0)  # 红色轮廓
+        )
     
-    # Create a separate transparent overlay for the fill
+    # 创建单独的透明覆盖层用于填充
     overlay = Image.new('RGBA', img_copy.size, (0, 0, 0, 0))
     draw_overlay = ImageDraw.Draw(overlay)
     
-    # Draw the semi-transparent fill
+    # 绘制半透明填充
     draw_overlay.rectangle(
         [(x1, y1), (x2, y2)],
-        fill=(255, 0, 0, 50)  # Red with 50% transparency
+        fill=(255, 0, 0, 50)  # 红色，50%透明度
     )
     
-    # Ensure both images are in RGBA mode before compositing
+    # 确保两个图像都是RGBA模式
     if img_copy.mode != 'RGBA':
         img_copy = img_copy.convert('RGBA')
     
-    # Composite the images
+    # 合成图像
     return Image.alpha_composite(img_copy, overlay)
 
 def get_selection_coordinates(start_point, end_point):
