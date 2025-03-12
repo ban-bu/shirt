@@ -240,7 +240,7 @@ with col1:
                 st.session_state.end_point = None
                 
                 # 刷新页面显示新的选择框
-                st.experimental_rerun()
+                st.rerun()
     
     # 显示已选择的区域数量
     if st.session_state.selection_areas:
@@ -250,7 +250,7 @@ with col1:
         if st.button("🗑️ 清除所有选择区域"):
             st.session_state.selection_areas = []
             st.session_state.current_image = st.session_state.base_image.copy()
-            st.experimental_rerun()
+            st.rerun()
 
 with col2:
     st.markdown("## 设计参数")
@@ -303,7 +303,7 @@ with col2:
                                 composite_image.paste(scaled_design, (left, top))
                     
                     st.session_state.final_design = composite_image
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("生成图像失败，请稍后重试。")
 
