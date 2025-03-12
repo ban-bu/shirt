@@ -60,7 +60,7 @@ def generate_vector_image(prompt: str):
 st.title("可自由拖动图案位置的个性化衣服定制")
 
 # 1. 加载衬衫底图（使用绝对路径）
-shirt_path = "/Users/wang/Desktop/T-shirt/white_shirt.png"
+shirt_path = "white_shirt.png"
 try:
     shirt_image = Image.open(shirt_path).convert("RGBA")
 except Exception as e:
