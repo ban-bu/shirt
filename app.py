@@ -85,43 +85,74 @@ colors = st.text_input("偏好颜色 (如 pink, gold, black)", "pink, gold")
 details = st.text_area("更多细节 (如 swirling shapes, futuristic touches)", "some swirling shapes")
 
 st.write("---")
-st.markdown("### 在下方画布上拖拽红框来决定图案放置的位置和大小：")
+st.markdown("### 在衬衫上直接拖拽红框来决定图案放置的位置和大小：")
 st.info("1. **选择 'Rect' 工具**\n"
-        "2. 在衣服上 **拖拽** 出一个红框\n"
+        "2. 在衬衫上 **拖拽** 出一个红框\n"
         "3. 可以 **移动/缩放** 红框\n"
         "4. 点右上角的 **X** 或按 ESC 键退出绘制模式")
 
-# 显示衬衫底图
-st.image(base_image, caption="T恤底图", use_column_width=True)
+# 使用CSS创建叠加效果
+st.markdown("""
+<style>
+.shirt-container {
+    position: relative;
+    width: fit-content;
+}
+.shirt-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+.canvas-container {
+    position: relative;
+    z-index: 2;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# 3. 在画布上拖拽矩形 - 不使用背景图像
-canvas_result = st_canvas(
-    fill_color="rgba(255, 0, 0, 0.3)",  # 矩形内部半透明红色
-    stroke_width=2,
-    stroke_color="red",
-    background_color="rgba(255, 255, 255, 0.01)",  # 几乎透明的背景
-    update_streamlit=True,
-    height=base_image.height,          # 画布高
-    width=base_image.width,            # 画布宽
-    drawing_mode="rect",               # 允许绘制矩形
-    key="shirt_canvas"
-)
+# 创建一个容器来放置画布
+canvas_container = st.container()
 
-# 4. 解析用户画的矩形数据（可能有多个，这里只取第一个）
-rect_data = None
+with canvas_container:
+    # 显示衬衫底图
+    st.image(base_image, caption="在此图上绘制红框", use_column_width=True)
+    
+    # 在画布上拖拽矩形 - 使用透明背景
+    canvas_result = st_canvas(
+        fill_color="rgba(255, 0, 0, 0.3)",  # 矩形内部半透明红色
+        stroke_width=2,
+        stroke_color="red",
+        background_color="rgba(255, 255, 255, 0.01)",  # 几乎透明的背景
+        update_streamlit=True,
+        height=base_image.height,          # 画布高
+        width=base_image.width,            # 画布宽
+        drawing_mode="rect",               # 允许绘制矩形
+        key="shirt_canvas"
+    )
+
+# 4. 解析用户画的矩形数据（支持多个矩形）
+rect_data_list = []
 if canvas_result.json_data is not None:
     objects = canvas_result.json_data.get("objects", [])
     if len(objects) > 0:
-        # 假设只使用用户绘制的最后一个矩形
-        rect_data = objects[-1]
+        # 收集所有矩形对象
+        for obj in objects:
+            if obj.get("type") == "rect":
+                rect_data_list.append(obj)
+        
+        if not rect_data_list:
+            # 如果没有找到矩形类型，则使用所有对象（兼容旧逻辑）
+            rect_data_list = objects
 
 # 5. 点击"生成定制衣服设计"按钮，调用 API 并将图案放到红框处
 if st.button("生成定制衣服设计"):
     if not theme.strip():
         st.warning("请至少输入主题或关键词！")
     else:
-        if rect_data is None:
-            st.warning("请先在画布上拖拽一个红框，用来放置图案！")
+        if not rect_data_list:
+            st.warning("请先在画布上拖拽至少一个红框，用来放置图案！")
         else:
             # 生成图案
             prompt_text = (
@@ -140,24 +171,26 @@ if st.button("生成定制衣服设计"):
                 # 显示生成的原始设计图
                 st.image(custom_design, caption="生成的原始设计图", use_column_width=True)
                 
-                # 解析矩形坐标和大小
-                # left, top 为红框左上角坐标
-                # width, height 为红框大小
-                left = rect_data["left"]
-                top = rect_data["top"]
-                rect_w = rect_data["width"]
-                rect_h = rect_data["height"]
-
-                # 将生成图案缩放到红框大小
-                custom_design = custom_design.resize((int(rect_w), int(rect_h)), Image.LANCZOS)
-
                 # 在原图上合成
                 composite_image = base_image.copy()
-                try:
-                    composite_image.paste(custom_design, (int(left), int(top)), custom_design)
-                except Exception as e:
-                    st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
-                    composite_image.paste(custom_design, (int(left), int(top)))
+                
+                # 遍历所有矩形，将设计图放置到每个矩形位置
+                for rect_data in rect_data_list:
+                    # 解析矩形坐标和大小
+                    left = rect_data["left"]
+                    top = rect_data["top"]
+                    rect_w = rect_data["width"]
+                    rect_h = rect_data["height"]
+
+                    # 将生成图案缩放到矩形框大小
+                    scaled_design = custom_design.resize((int(rect_w), int(rect_h)), Image.LANCZOS)
+
+                    try:
+                        # 确保使用透明通道进行粘贴
+                        composite_image.paste(scaled_design, (int(left), int(top)), scaled_design)
+                    except Exception as e:
+                        st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
+                        composite_image.paste(scaled_design, (int(left), int(top)))
 
                 st.image(composite_image, caption="您的个性化定制衣服设计", use_column_width=True)
                 
