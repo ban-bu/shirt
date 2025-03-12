@@ -3,16 +3,25 @@ from PIL import Image
 import requests
 from io import BytesIO
 import cairosvg
+import base64  # 添加base64模块用于图像编码
 
 # 需要先安装: pip install streamlit-drawable-canvas
 from streamlit_drawable_canvas import st_canvas
 
 # ========== Deepbricks 配置信息，请自行替换 ==========
 from openai import OpenAI
-API_KEY = "YOUR_API_KEY"  # 不要在公开场合暴露真实密钥
+API_KEY = st.secrets["API_KEY"] if "API_KEY" in st.secrets else "YOUR_API_KEY"  # 使用Streamlit Secrets
 BASE_URL = "https://api.deepbricks.ai/v1/"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 # ==============================================
+
+# 添加函数将PIL图像转换为base64数据URL
+def pil_to_b64_url(pil_img):
+    """将PIL图像转换为base64数据URL"""
+    buffered = BytesIO()
+    pil_img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    return f"data:image/png;base64,{img_str}"
 
 def generate_vector_image(prompt):
     """
@@ -31,7 +40,8 @@ def generate_vector_image(prompt):
         st.error(f"调用 API 时出错: {e}")
         return None
 
-    if resp and hasattr(resp, "data") and resp.data and hasattr(resp.data[0], "url"):
+    # 更新访问响应数据的方式，适配最新的OpenAI API
+    if resp and len(resp.data) > 0 and resp.data[0].url:
         image_url = resp.data[0].url
         try:
             image_resp = requests.get(image_url)
@@ -41,12 +51,12 @@ def generate_vector_image(prompt):
                     # 若是 SVG，则先转换为 PNG
                     try:
                         png_data = cairosvg.svg2png(bytestring=image_resp.content)
-                        return Image.open(BytesIO(png_data))
+                        return Image.open(BytesIO(png_data)).convert("RGBA")
                     except Exception as conv_err:
                         st.error(f"SVG 转 PNG 时出错: {conv_err}")
                         return None
                 else:
-                    return Image.open(BytesIO(image_resp.content))
+                    return Image.open(BytesIO(image_resp.content)).convert("RGBA")
             else:
                 st.error(f"下载图像失败，状态码：{image_resp.status_code}")
         except Exception as download_err:
@@ -81,12 +91,15 @@ st.info("1. **选择 'Rect' 工具**\n"
         "3. 可以 **移动/缩放** 红框\n"
         "4. 点右上角的 **X** 或按 ESC 键退出绘制模式")
 
+# 将PIL图像转换为base64数据URL
+base_image_url = pil_to_b64_url(base_image)
+
 # 3. 在画布上拖拽矩形
 canvas_result = st_canvas(
     fill_color="rgba(255, 0, 0, 0.3)",  # 矩形内部半透明红色
     stroke_width=2,
     stroke_color="red",
-    background_image=base_image,        # 衬衫作为背景
+    background_image=base_image_url,    # 使用base64 URL而不是PIL图像
     update_streamlit=True,
     height=base_image.height,          # 画布高
     width=base_image.width,            # 画布宽
@@ -102,7 +115,7 @@ if canvas_result.json_data is not None:
         # 假设只使用用户绘制的最后一个矩形
         rect_data = objects[-1]
 
-# 5. 点击“生成定制衣服设计”按钮，调用 API 并将图案放到红框处
+# 5. 点击"生成定制衣服设计"按钮，调用 API 并将图案放到红框处
 if st.button("生成定制衣服设计"):
     if not theme.strip():
         st.warning("请至少输入主题或关键词！")
@@ -117,11 +130,16 @@ if st.button("生成定制衣服设计"):
                 f"Style: {style}. "
                 f"Colors: {colors}. "
                 f"Details: {details}. "
-                f"Make it visually appealing."
+                f"Make it visually appealing with transparent background."  # 添加透明背景要求
             )
-            custom_design = generate_vector_image(prompt_text)
+            
+            with st.spinner("正在生成设计图..."):
+                custom_design = generate_vector_image(prompt_text)
 
             if custom_design:
+                # 显示生成的原始设计图
+                st.image(custom_design, caption="生成的原始设计图", use_column_width=True)
+                
                 # 解析矩形坐标和大小
                 # left, top 为红框左上角坐标
                 # width, height 为红框大小
@@ -142,5 +160,16 @@ if st.button("生成定制衣服设计"):
                     composite_image.paste(custom_design, (int(left), int(top)))
 
                 st.image(composite_image, caption="您的个性化定制衣服设计", use_column_width=True)
+                
+                # 提供下载选项
+                buf = BytesIO()
+                composite_image.save(buf, format="PNG")
+                buf.seek(0)
+                st.download_button(
+                    label="下载定制效果",
+                    data=buf,
+                    file_name="custom_tshirt.png",
+                    mime="image/png"
+                )
             else:
                 st.error("生成图像失败，请稍后重试。")
