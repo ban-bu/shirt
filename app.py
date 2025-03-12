@@ -88,21 +88,24 @@ def generate_vector_image(prompt):
         st.error("未能从 API 响应中获取图像 URL。")
     return None
 
-def draw_selection_box(image, start_point, end_point):
-    """在图像上绘制选择框"""
+def draw_selection_box(image, start_point):
+    """在图像上绘制固定大小的选择框"""
     # 创建图像副本以避免修改原始图像
     img_copy = image.copy()
     draw = ImageDraw.Draw(img_copy)
     
-    # 确保坐标格式正确
+    # 固定框的大小
+    box_size = 1024
+    
+    # 计算结束点（基于固定大小）
     x1, y1 = start_point
-    x2, y2 = end_point
+    x2, y2 = x1 + box_size, y1 + box_size
     
     # 绘制红色轮廓
     draw.rectangle(
         [(x1, y1), (x2, y2)],
         outline=(255, 0, 0),
-        width=2  # 设置线条宽度
+        width=2
     )
     
     # 创建单独的透明覆盖层用于填充
@@ -112,7 +115,7 @@ def draw_selection_box(image, start_point, end_point):
     # 绘制半透明填充
     draw_overlay.rectangle(
         [(x1, y1), (x2, y2)],
-        fill=(255, 0, 0, 50)  # 红色，50%透明度
+        fill=(255, 0, 0, 50)
     )
     
     # 确保两个图像都是RGBA模式
@@ -124,30 +127,16 @@ def draw_selection_box(image, start_point, end_point):
         return Image.alpha_composite(img_copy, overlay)
     except Exception as e:
         st.warning(f"图像合成失败: {e}")
-        # 如果合成失败，至少返回带边框的图像
         return img_copy
 
-def get_selection_coordinates(start_point, end_point):
-    """获取选择框的坐标和尺寸"""
+def get_selection_coordinates(start_point):
+    """获取固定大小选择框的坐标和尺寸"""
     x1, y1 = start_point
-    x2, y2 = end_point
+    box_size = 1024
     
-    # 确保坐标是从左上到右下
-    left = min(x1, x2)
-    top = min(y1, y2)
-    right = max(x1, x2)
-    bottom = max(y1, y2)
-    
-    width = right - left
-    height = bottom - top
-    
-    return (left, top, width, height)
+    return (x1, y1, box_size, box_size)
 
 # 初始化会话状态
-if 'start_point' not in st.session_state:
-    st.session_state.start_point = None
-if 'end_point' not in st.session_state:
-    st.session_state.end_point = None
 if 'selection_mode' not in st.session_state:
     st.session_state.selection_mode = False
 if 'selection_areas' not in st.session_state:
@@ -203,44 +192,26 @@ with col1:
     
     # 处理选择区域逻辑
     if st.session_state.selection_mode and coordinates:
-        if st.session_state.start_point is None:
-            st.session_state.start_point = (coordinates["x"], coordinates["y"])
-        else:
-            st.session_state.end_point = (coordinates["x"], coordinates["y"])
-            
-            # 绘制选择框
-            if st.session_state.start_point and st.session_state.end_point:
-                temp_image = st.session_state.base_image.copy()
-                
-                # 绘制已有的选择区域
-                for area in st.session_state.selection_areas:
-                    left, top, width, height = area
-                    area_start = (left, top)
-                    area_end = (left + width, top + height)
-                    temp_image = draw_selection_box(temp_image, area_start, area_end)
-                
-                # 绘制当前选择区域
-                temp_image = draw_selection_box(
-                    temp_image, 
-                    st.session_state.start_point, 
-                    st.session_state.end_point
-                )
-                
-                st.session_state.current_image = temp_image
-                
-                # 添加选择区域到列表
-                selection = get_selection_coordinates(
-                    st.session_state.start_point, 
-                    st.session_state.end_point
-                )
-                st.session_state.selection_areas.append(selection)
-                
-                # 重置选择点
-                st.session_state.start_point = None
-                st.session_state.end_point = None
-                
-                # 刷新页面显示新的选择框
-                st.rerun()
+        # 更新当前鼠标位置的选择框
+        temp_image = st.session_state.base_image.copy()
+        
+        # 绘制已有的选择区域
+        for area in st.session_state.selection_areas:
+            left, top, width, height = area
+            area_start = (left, top)
+            temp_image = draw_selection_box(temp_image, area_start)
+        
+        # 绘制当前跟随鼠标的选择框
+        current_point = (coordinates["x"], coordinates["y"])
+        temp_image = draw_selection_box(temp_image, current_point)
+        
+        st.session_state.current_image = temp_image
+        
+        # 当点击时添加选择区域
+        if st.button("📌 固定当前选择区域"):
+            selection = get_selection_coordinates(current_point)
+            st.session_state.selection_areas.append(selection)
+            st.rerun()
     
     # 显示已选择的区域数量
     if st.session_state.selection_areas:
