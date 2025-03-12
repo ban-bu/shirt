@@ -91,46 +91,24 @@ st.info("1. **选择 'Rect' 工具**\n"
         "3. 可以 **移动/缩放** 红框\n"
         "4. 点右上角的 **X** 或按 ESC 键退出绘制模式")
 
-# 使用CSS创建叠加效果
-st.markdown("""
-<style>
-.shirt-container {
-    position: relative;
-    width: fit-content;
-}
-.shirt-image {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 1;
-    pointer-events: none;
-}
-.canvas-container {
-    position: relative;
-    z-index: 2;
-}
-</style>
-""", unsafe_allow_html=True)
+# 将PIL图像转换为base64数据URL
+base_image_url = pil_to_b64_url(base_image)
 
-# 创建一个容器来放置画布
-canvas_container = st.container()
+# 不再单独显示衬衫底图
+# 删除: st.image(base_image, caption="T恤底图", use_column_width=True)
 
-with canvas_container:
-    # 显示衬衫底图
-    st.image(base_image, caption="在此图上绘制红框", use_column_width=True)
-    
-    # 在画布上拖拽矩形 - 使用透明背景
-    canvas_result = st_canvas(
-        fill_color="rgba(255, 0, 0, 0.3)",  # 矩形内部半透明红色
-        stroke_width=2,
-        stroke_color="red",
-        background_color="rgba(255, 255, 255, 0.01)",  # 几乎透明的背景
-        update_streamlit=True,
-        height=base_image.height,          # 画布高
-        width=base_image.width,            # 画布宽
-        drawing_mode="rect",               # 允许绘制矩形
-        key="shirt_canvas"
-    )
+# 3. 在画布上拖拽矩形 - 直接使用衬衫作为背景
+canvas_result = st_canvas(
+    fill_color="rgba(255, 0, 0, 0.3)",  # 矩形内部半透明红色
+    stroke_width=2,
+    stroke_color="red",
+    background_image=base_image_url,  # 使用base64编码的衬衫图片作为背景
+    update_streamlit=True,
+    height=base_image.height,          # 画布高
+    width=base_image.width,            # 画布宽
+    drawing_mode="rect",               # 允许绘制矩形
+    key="shirt_canvas"
+)
 
 # 4. 解析用户画的矩形数据（支持多个矩形）
 rect_data_list = []
