@@ -3,15 +3,14 @@ from PIL import Image
 import requests
 from io import BytesIO
 import cairosvg
-import numpy as np
 
-# 关键：导入 streamlit-drawable-canvas 库
+# 导入 streamlit-drawable-canvas
 from streamlit_drawable_canvas import st_canvas
 
 # ========== Deepbricks/OpenAI 配置信息 ==========
 from openai import OpenAI
 
-API_KEY = "YOUR_API_KEY"  # 请替换为你自己的 Deepbricks API Key
+API_KEY = "YOUR_API_KEY"  # 请替换为你自己的 API Key
 BASE_URL = "https://api.deepbricks.ai/v1/"
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
@@ -33,14 +32,12 @@ def generate_vector_image(prompt: str):
         st.error(f"调用 API 时出错: {e}")
         return None
 
-    # 检查响应并获取图像 URL
     if resp and hasattr(resp, "data") and resp.data and hasattr(resp.data[0], "url"):
         image_url = resp.data[0].url
         try:
             image_resp = requests.get(image_url)
             if image_resp.status_code == 200:
                 content_type = image_resp.headers.get("Content-Type", "")
-                # 如果返回的是 SVG 格式，则转换为 PNG
                 if "svg" in content_type.lower():
                     try:
                         png_data = cairosvg.svg2png(bytestring=image_resp.content)
@@ -60,7 +57,7 @@ def generate_vector_image(prompt: str):
 
 st.title("可自由拖动图案位置的个性化衣服定制")
 
-# 1. 加载衬衫底图
+# 1. 加载衬衫底图（作为背景图，传递给 st_canvas 时直接使用 PIL Image）
 try:
     shirt_image = Image.open("white_shirt.png").convert("RGBA")
 except Exception as e:
@@ -73,7 +70,6 @@ if "design_img" not in st.session_state:
 
 # 3. 用户输入个性化定制参数
 st.subheader("请输入您的个性化定制需求：")
-
 theme = st.text_input("主题或关键词 (必填)", "花卉图案")
 style = st.text_input("设计风格 (如 abstract, cartoon, realistic 等)", "abstract")
 colors = st.text_input("偏好颜色 (如 pink, gold, black)", "pink, gold")
@@ -101,16 +97,16 @@ if st.button("生成设计图"):
 
 # 5. 显示画布，让用户用鼠标在衬衫上绘制矩形
 st.write("在下方画布上 **绘制一个矩形**，表示图案要贴的位置和大小。")
-# 关键：将 shirt_image 转为 NumPy 数组后传递给 background_image
+# 直接传入 shirt_image（PIL 图像）作为背景图
 canvas_result = st_canvas(
     fill_color="rgba(255, 255, 255, 0)",   # 透明填充
     stroke_width=3,
     stroke_color="red",
-    background_image=np.array(shirt_image),
+    background_image=shirt_image,
     update_streamlit=True,
     height=shirt_image.height,
     width=shirt_image.width,
-    drawing_mode="rect",   # 仅允许画矩形
+    drawing_mode="rect",   # 仅允许绘制矩形
     key="canvas",
 )
 
@@ -124,16 +120,16 @@ if st.button("叠加图案到衣服"):
             if len(objects) == 0:
                 st.warning("你尚未在画布上绘制任何矩形。")
             else:
-                # 取最后一个矩形对象
+                # 取最后一个绘制的矩形对象
                 rect = objects[-1]
                 left = int(rect["left"])
                 top = int(rect["top"])
                 width = int(rect["width"])
                 height = int(rect["height"])
 
-                # 从 session_state 中获取设计图
+                # 从 session_state 获取设计图
                 design_img = st.session_state["design_img"]
-                # 将设计图缩放到矩形大小
+                # 将设计图缩放到矩形框的大小
                 scaled_design = design_img.resize((width, height), Image.LANCZOS)
 
                 # 将图案贴到衬衫底图
