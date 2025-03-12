@@ -59,8 +59,8 @@ def generate_vector_image(prompt: str):
 
 st.title("可自由拖动图案位置的个性化衣服定制")
 
-# 1. 加载衬衫底图（使用绝对路径）
-shirt_path = "white_shirt.png"
+# 1. 加载衬衫底图（使用相对路径）
+shirt_path = "white_shirt.png"  # 改为相对路径
 try:
     shirt_image = Image.open(shirt_path).convert("RGBA")
 except Exception as e:
@@ -145,7 +145,7 @@ if st.button("叠加图案到衣服"):
                     
                     # 提供保存选项
                     if st.button("保存定制效果"):
-                        save_path = "/Users/wang/Desktop/T-shirt/custom_tshirt.png"
+                        save_path = "custom_tshirt.png"  # 改为相对路径
                         composite.save(save_path)
                         st.success(f"定制效果已保存至: {save_path}")
                 except Exception as e:
