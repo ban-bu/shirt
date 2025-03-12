@@ -91,21 +91,26 @@ st.info("1. **选择 'Rect' 工具**\n"
         "3. 可以 **移动/缩放** 红框\n"
         "4. 点右上角的 **X** 或按 ESC 键退出绘制模式")
 
-# 显示衬衫底图
-st.image(base_image, caption="T恤底图", use_column_width=True)
+# 创建两列布局
+col1, col2 = st.columns(2)
 
-# 3. 在画布上拖拽矩形 - 使用透明背景
-canvas_result = st_canvas(
-    fill_color="rgba(255, 0, 0, 0.3)",  # 矩形内部半透明红色
-    stroke_width=2,
-    stroke_color="red",
-    background_color="rgba(255, 255, 255, 0.01)",  # 几乎透明的背景
-    update_streamlit=True,
-    height=base_image.height,          # 画布高
-    width=base_image.width,            # 画布宽
-    drawing_mode="rect",               # 允许绘制矩形
-    key="shirt_canvas"
-)
+with col1:
+    # 显示衬衫底图
+    st.image(base_image, caption="参考图 - 在右侧画布上绘制红框", use_column_width=True)
+
+with col2:
+    # 在画布上拖拽矩形 - 使用透明背景
+    canvas_result = st_canvas(
+        fill_color="rgba(255, 0, 0, 0.3)",  # 矩形内部半透明红色
+        stroke_width=2,
+        stroke_color="red",
+        background_color="rgba(255, 255, 255, 0.01)",  # 几乎透明的背景
+        update_streamlit=True,
+        height=base_image.height,          # 画布高
+        width=base_image.width,            # 画布宽
+        drawing_mode="rect",               # 允许绘制矩形
+        key="shirt_canvas"
+    )
 
 # 4. 解析用户画的矩形数据（支持多个矩形）
 rect_data_list = []
