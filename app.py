@@ -3,6 +3,7 @@ from PIL import Image
 import requests
 from io import BytesIO
 import cairosvg
+import numpy as np
 
 # 关键：导入 streamlit-drawable-canvas 库
 from streamlit_drawable_canvas import st_canvas
@@ -26,7 +27,7 @@ def generate_vector_image(prompt: str):
             prompt=prompt,
             n=1,
             size="1024x1024",
-            quality="standard"    # 标准画质
+            quality="standard"     # 标准画质
         )
     except Exception as e:
         st.error(f"调用 API 时出错: {e}")
@@ -57,8 +58,6 @@ def generate_vector_image(prompt: str):
         st.error("未能从 API 响应中获取图像 URL。")
     return None
 
-# ========== Streamlit 主体界面 ==========
-
 st.title("可自由拖动图案位置的个性化衣服定制")
 
 # 1. 加载衬衫底图
@@ -83,7 +82,6 @@ details = st.text_area("更多细节 (如 swirling shapes, futuristic touches)",
 # 4. 生成设计图按钮：调用 generate_vector_image
 if st.button("生成设计图"):
     if theme.strip():
-        # 将用户输入的参数组合成一个完整提示词
         prompt_text = (
             f"Create a unique T-shirt design. "
             f"Theme: {theme}. "
@@ -103,12 +101,12 @@ if st.button("生成设计图"):
 
 # 5. 显示画布，让用户用鼠标在衬衫上绘制矩形
 st.write("在下方画布上 **绘制一个矩形**，表示图案要贴的位置和大小。")
-
+# 关键：将 shirt_image 转为 NumPy 数组后传递给 background_image
 canvas_result = st_canvas(
     fill_color="rgba(255, 255, 255, 0)",   # 透明填充
     stroke_width=3,
     stroke_color="red",
-    background_image=shirt_image,
+    background_image=np.array(shirt_image),
     update_streamlit=True,
     height=shirt_image.height,
     width=shirt_image.width,
@@ -136,7 +134,7 @@ if st.button("叠加图案到衣服"):
                 # 从 session_state 中获取设计图
                 design_img = st.session_state["design_img"]
                 # 将设计图缩放到矩形大小
-                scaled_design = design_img.resize((width, height))
+                scaled_design = design_img.resize((width, height), Image.LANCZOS)
 
                 # 将图案贴到衬衫底图
                 composite = shirt_image.copy()
