@@ -6,7 +6,7 @@ from io import BytesIO
 import cairosvg
 
 # ========== 配置信息 ==========
-API_KEY = "sk-lNVAREVHjj386FDCd9McOL7k66DZCUkTp6IbV0u9970qqdlg"  # 请妥善保管密钥，不要直接公开
+API_KEY = "sk-lNVAREVHjj386FDCd9McOL7k66DZCUkTp6IbV0u9970qqdlg"  # 请妥善保管密钥
 BASE_URL = "https://api.deepbricks.ai/v1/"
 # =================================
 
@@ -56,7 +56,7 @@ def generate_vector_image(prompt):
 
 st.title("个性化定制衣服生成系统")
 
-# 加载基础白衬衫图片（仅用于图像合成，不再在左侧显示）
+# 加载基础白衬衫图片（仅用于图像合成，不在侧边栏显示）
 try:
     shirt_image = Image.open('white_shirt.png')
 except Exception as e:
@@ -70,26 +70,39 @@ style = st.text_input("设计风格 (如 abstract, cartoon, realistic 等)", "ab
 colors = st.text_input("偏好颜色 (如 pink, gold, black)", "pink, gold")
 details = st.text_area("更多细节 (如 swirling shapes, futuristic touches)", "some swirling shapes")
 
-st.subheader("自定义图案在衬衫上的显示：")
-scale_ratio = st.slider("图案尺寸比例（相对于衬衫宽度）", min_value=0.1, max_value=1.0, value=0.3, step=0.05)
-offset_x = st.slider("X 方向偏移（正值向右，负值向左）", -200, 200, 0, step=5)
-offset_y = st.slider("Y 方向偏移（正值向下，负值向上）", -200, 200, 0, step=5)
+st.subheader("选择图案在衬衫上的位置：")
+# 使用单选按钮简化位置调节
+horizontal_pos = st.radio("水平方向", options=["左侧", "中间", "右侧"], index=1)
+vertical_pos = st.radio("垂直方向", options=["上侧", "中间", "下侧"], index=1)
 
-# 自动生成预览位置
-# 使用默认图案宽高比 1:1（仅用于预览，不影响实际生成后的尺寸）
-default_ratio = 1.0
+# 自动生成预览位置（采用默认尺寸比例 0.3，用于预览）
 shirt_w, shirt_h = shirt_image.size
-preview_design_w = int(shirt_w * scale_ratio)
-preview_design_h = int(preview_design_w / default_ratio)
-preview_pos_x = (shirt_w - preview_design_w) // 2 + offset_x
-preview_pos_y = (shirt_h - preview_design_h) // 2 + offset_y
+preview_design_w = int(shirt_w * 0.3)
+preview_design_h = preview_design_w  # 预览时采用1:1比例，仅供参考
+
+if horizontal_pos == "左侧":
+    preview_pos_x = 0
+elif horizontal_pos == "中间":
+    preview_pos_x = (shirt_w - preview_design_w) // 2
+else:  # "右侧"
+    preview_pos_x = shirt_w - preview_design_w
+
+if vertical_pos == "上侧":
+    preview_pos_y = 0
+elif vertical_pos == "中间":
+    preview_pos_y = (shirt_h - preview_design_h) // 2
+else:  # "下侧"
+    preview_pos_y = shirt_h - preview_design_h
 
 preview_image = shirt_image.copy().convert("RGBA")
 draw = ImageDraw.Draw(preview_image)
-draw.rectangle((preview_pos_x, preview_pos_y, preview_pos_x + preview_design_w, preview_pos_y + preview_design_h), outline="red", width=3)
+draw.rectangle(
+    (preview_pos_x, preview_pos_y, preview_pos_x + preview_design_w, preview_pos_y + preview_design_h),
+    outline="red",
+    width=3
+)
 st.image(preview_image, caption="预览设计放置位置", use_column_width=True)
 
-# 生成定制设计
 if st.button("生成定制衣服设计"):
     if theme.strip():
         prompt_text = (
@@ -103,15 +116,26 @@ if st.button("生成定制衣服设计"):
         custom_design = generate_vector_image(prompt_text)
         if custom_design:
             shirt_w, shirt_h = shirt_image.size
-            # 使用生成图像实际宽高比调整尺寸
-            design_w = int(shirt_w * scale_ratio)
+            # 生成图像实际尺寸采用 0.3 的比例
+            design_w = int(shirt_w * 0.3)
             design_ratio = custom_design.width / custom_design.height
             design_h = int(design_w / design_ratio)
             custom_design = custom_design.resize((design_w, design_h), Image.LANCZOS)
             
-            pos_x = (shirt_w - design_w) // 2 + offset_x
-            pos_y = (shirt_h - design_h) // 2 + offset_y
-            
+            if horizontal_pos == "左侧":
+                pos_x = 0
+            elif horizontal_pos == "中间":
+                pos_x = (shirt_w - design_w) // 2
+            else:  # "右侧"
+                pos_x = shirt_w - design_w
+
+            if vertical_pos == "上侧":
+                pos_y = 0
+            elif vertical_pos == "中间":
+                pos_y = (shirt_h - design_h) // 2
+            else:  # "下侧"
+                pos_y = shirt_h - design_h
+
             composite_image = shirt_image.copy()
             try:
                 composite_image.paste(custom_design, (pos_x, pos_y), custom_design)
