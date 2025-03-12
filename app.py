@@ -4,22 +4,20 @@ import requests
 from io import BytesIO
 import cairosvg
 
-# 关键：导入 st_canvas
+# 需要先安装: pip install streamlit-drawable-canvas
 from streamlit_drawable_canvas import st_canvas
 
-# 如果你使用 Deepbricks 中介 OpenAI，请引入并配置：
+# ========== Deepbricks 配置信息，请自行替换 ==========
 from openai import OpenAI
-
-API_KEY = "YOUR_API_KEY"  # 请妥善保管，不要在公开场合直接暴露
+API_KEY = "YOUR_API_KEY"  # 不要在公开场合暴露真实密钥
 BASE_URL = "https://api.deepbricks.ai/v1/"
-
-# 初始化 OpenAI 客户端
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+# ==============================================
 
-def generate_vector_image(prompt: str):
+def generate_vector_image(prompt):
     """
-    调用 Deepbricks 图像生成接口。如果响应为 SVG，则用 cairosvg 转为 PNG；
-    否则直接用 PIL 打开。
+    根据提示词调用 Deepbricks 接口生成图像。
+    如果响应为 SVG，则用 cairosvg 转换为 PNG，否则直接返回位图。
     """
     try:
         resp = client.images.generate(
@@ -40,7 +38,7 @@ def generate_vector_image(prompt: str):
             if image_resp.status_code == 200:
                 content_type = image_resp.headers.get("Content-Type", "")
                 if "svg" in content_type.lower():
-                    # 如果是 SVG 则转换为 PNG
+                    # 若是 SVG，则先转换为 PNG
                     try:
                         png_data = cairosvg.svg2png(bytestring=image_resp.content)
                         return Image.open(BytesIO(png_data))
@@ -48,7 +46,6 @@ def generate_vector_image(prompt: str):
                         st.error(f"SVG 转 PNG 时出错: {conv_err}")
                         return None
                 else:
-                    # 否则直接打开位图
                     return Image.open(BytesIO(image_resp.content))
             else:
                 st.error(f"下载图像失败，状态码：{image_resp.status_code}")
@@ -58,76 +55,92 @@ def generate_vector_image(prompt: str):
         st.error("未能从 API 响应中获取图像 URL。")
     return None
 
-# ============ Streamlit 应用界面 ============
 
-st.title("可拖动定制图案位置的衣服生成系统")
+# ========== Streamlit 应用 ==========
+
+st.title("可自由拖拽的个性化定制衣服生成系统")
 
 # 1. 加载衬衫底图
 try:
-    shirt_image = Image.open("white_shirt.png").convert("RGBA")
+    base_image = Image.open("white_shirt.png").convert("RGBA")
 except Exception as e:
     st.error(f"加载白衬衫图片时出错: {e}")
     st.stop()
 
-shirt_w, shirt_h = shirt_image.size
-
-# 2. 用户输入定制提示
+# 2. 用户输入个性化参数
 st.subheader("请输入您的个性化定制需求：")
-prompt = st.text_input("设计提示词 (必填)", "A colorful floral pattern")
+theme = st.text_input("主题或关键词 (必填)", "花卉图案")
+style = st.text_input("设计风格 (如 abstract, cartoon, realistic 等)", "abstract")
+colors = st.text_input("偏好颜色 (如 pink, gold, black)", "pink, gold")
+details = st.text_area("更多细节 (如 swirling shapes, futuristic touches)", "some swirling shapes")
 
-# 3. 使用 st_canvas 在衬衫图片上拖动矩形
-st.write("在下方画布上拖动一个矩形来指定图案摆放区域：")
+st.write("---")
+st.markdown("### 在下方画布上拖拽红框来决定图案放置的位置和大小：")
+st.info("1. **选择 'Rect' 工具**\n"
+        "2. 在衣服上 **拖拽** 出一个红框\n"
+        "3. 可以 **移动/缩放** 红框\n"
+        "4. 点右上角的 **X** 或按 ESC 键退出绘制模式")
 
-# 创建可绘制画布
+# 3. 在画布上拖拽矩形
 canvas_result = st_canvas(
-    fill_color="rgba(255, 0, 0, 0.2)",   # 绘制矩形的填充色（半透明红色）
+    fill_color="rgba(255, 0, 0, 0.3)",  # 矩形内部半透明红色
     stroke_width=2,
-    stroke_color="red",                 # 边框颜色
-    background_image=shirt_image,       # 背景：白衬衫图
+    stroke_color="red",
+    background_image=base_image,        # 衬衫作为背景
     update_streamlit=True,
-    width=shirt_w,
-    height=shirt_h,
-    drawing_mode="rect",               # 只允许画矩形
-    key="canvas"
+    height=base_image.height,          # 画布高
+    width=base_image.width,            # 画布宽
+    drawing_mode="rect",               # 允许绘制矩形
+    key="shirt_canvas"
 )
 
-st.caption("提示：如需调整矩形，可在工具栏中选择 'Select' 模式后拖动/缩放已画好的矩形。")
+# 4. 解析用户画的矩形数据（可能有多个，这里只取第一个）
+rect_data = None
+if canvas_result.json_data is not None:
+    objects = canvas_result.json_data.get("objects", [])
+    if len(objects) > 0:
+        # 假设只使用用户绘制的最后一个矩形
+        rect_data = objects[-1]
 
-# 4. 点击按钮后，调用 AI 接口并合成图案
+# 5. 点击“生成定制衣服设计”按钮，调用 API 并将图案放到红框处
 if st.button("生成定制衣服设计"):
-    # 确保用户输入了提示词
-    if prompt.strip():
-        # 从 canvas_result 获取最后一个绘制的矩形数据
-        if canvas_result.json_data is not None:
-            objects = canvas_result.json_data.get("objects", [])
-            if objects:
-                # 假设我们取最后一个矩形
-                rect = objects[-1]
-                left = rect["left"]
-                top = rect["top"]
-                width = rect["width"]
-                height = rect["height"]
-
-                # 生成图案
-                custom_design = generate_vector_image(prompt)
-                if custom_design:
-                    # 按矩形大小缩放图案
-                    custom_design = custom_design.resize(
-                        (int(width), int(height)), Image.LANCZOS
-                    )
-
-                    # 合成：把图案贴到衬衫图像相应位置
-                    composite_image = shirt_image.copy()
-                    try:
-                        composite_image.paste(custom_design, (int(left), int(top)), custom_design)
-                    except Exception as e:
-                        st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
-                        composite_image.paste(custom_design, (int(left), int(top)))
-
-                    st.image(composite_image, caption="您的个性化定制衣服设计", use_column_width=True)
-                else:
-                    st.error("生成图像失败，请稍后重试。")
-            else:
-                st.warning("请先在画布上绘制一个矩形来指定图案位置！")
+    if not theme.strip():
+        st.warning("请至少输入主题或关键词！")
     else:
-        st.warning("请先输入设计提示词。")
+        if rect_data is None:
+            st.warning("请先在画布上拖拽一个红框，用来放置图案！")
+        else:
+            # 生成图案
+            prompt_text = (
+                f"Create a unique T-shirt design. "
+                f"Theme: {theme}. "
+                f"Style: {style}. "
+                f"Colors: {colors}. "
+                f"Details: {details}. "
+                f"Make it visually appealing."
+            )
+            custom_design = generate_vector_image(prompt_text)
+
+            if custom_design:
+                # 解析矩形坐标和大小
+                # left, top 为红框左上角坐标
+                # width, height 为红框大小
+                left = rect_data["left"]
+                top = rect_data["top"]
+                rect_w = rect_data["width"]
+                rect_h = rect_data["height"]
+
+                # 将生成图案缩放到红框大小
+                custom_design = custom_design.resize((int(rect_w), int(rect_h)), Image.LANCZOS)
+
+                # 在原图上合成
+                composite_image = base_image.copy()
+                try:
+                    composite_image.paste(custom_design, (int(left), int(top)), custom_design)
+                except Exception as e:
+                    st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
+                    composite_image.paste(custom_design, (int(left), int(top)))
+
+                st.image(composite_image, caption="您的个性化定制衣服设计", use_column_width=True)
+            else:
+                st.error("生成图像失败，请稍后重试。")
