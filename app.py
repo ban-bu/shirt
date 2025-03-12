@@ -11,7 +11,7 @@ from streamlit_drawable_canvas import st_canvas
 # ========== Deepbricks/OpenAI 配置信息 ==========
 from openai import OpenAI
 
-API_KEY = "YOUR_API_KEY"  # 请替换为你自己的 API Key
+API_KEY = st.secrets["API_KEY"] if "API_KEY" in st.secrets else "YOUR_API_KEY"  # 使用Streamlit Secrets管理API密钥
 BASE_URL = "https://api.deepbricks.ai/v1/"
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
@@ -60,7 +60,7 @@ def generate_vector_image(prompt: str):
 st.title("可自由拖动图案位置的个性化衣服定制")
 
 # 1. 加载衬衫底图（使用相对路径）
-shirt_path = "white_shirt.png"  # 改为相对路径
+shirt_path = "white_shirt.png"
 try:
     shirt_image = Image.open(shirt_path).convert("RGBA")
 except Exception as e:
@@ -94,6 +94,8 @@ if st.button("生成设计图"):
         if design_img:
             st.session_state["design_img"] = design_img
             st.success("设计图已生成，请在下方画布上绘制矩形来放置图案。")
+            # 显示生成的设计图
+            st.image(design_img, caption="生成的设计图", use_column_width=True)
         else:
             st.error("设计图生成失败，请稍后重试。")
     else:
@@ -101,18 +103,22 @@ if st.button("生成设计图"):
 
 # 5. 显示画布，让用户用鼠标在衬衫上绘制矩形
 st.write("在下方画布上 **绘制一个矩形**，表示图案要贴的位置和大小。")
-# 直接传入 shirt_image（PIL 图像）作为背景图
-canvas_result = st_canvas(
-    fill_color="rgba(255, 255, 255, 0)",   # 透明填充
-    stroke_width=3,
-    stroke_color="red",
-    background_image=shirt_image,
-    update_streamlit=True,
-    height=shirt_image.height,
-    width=shirt_image.width,
-    drawing_mode="rect",   # 仅允许绘制矩形
-    key="canvas",
-)
+
+# 创建一个容器来显示画布，以便控制其宽度
+canvas_container = st.container()
+with canvas_container:
+    # 直接传入 shirt_image（PIL 图像）作为背景图
+    canvas_result = st_canvas(
+        fill_color="rgba(255, 255, 255, 0)",   # 透明填充
+        stroke_width=3,
+        stroke_color="red",
+        background_image=shirt_image,
+        update_streamlit=True,
+        height=shirt_image.height,
+        width=shirt_image.width,
+        drawing_mode="rect",   # 仅允许绘制矩形
+        key="canvas",
+    )
 
 # 6. 叠加图案到衣服
 if st.button("叠加图案到衣服"):
@@ -143,12 +149,21 @@ if st.button("叠加图案到衣服"):
                     composite.paste(scaled_design, (left, top), scaled_design)
                     st.image(composite, caption="最终定制效果", use_column_width=True)
                     
-                    # 提供保存选项
-                    if st.button("保存定制效果"):
-                        save_path = "custom_tshirt.png"  # 改为相对路径
-                        composite.save(save_path)
-                        st.success(f"定制效果已保存至: {save_path}")
+                    # 提供下载选项而不是保存选项（适用于Streamlit Cloud）
+                    buf = BytesIO()
+                    composite.save(buf, format="PNG")
+                    buf.seek(0)
+                    st.download_button(
+                        label="下载定制效果",
+                        data=buf,
+                        file_name="custom_tshirt.png",
+                        mime="image/png"
+                    )
                 except Exception as e:
                     st.error(f"粘贴图案时出现问题：{e}")
         else:
             st.warning("未检测到任何绘制数据。")
+
+# 添加页脚
+st.markdown("---")
+st.markdown("© 2023 T恤定制应用 | 由Streamlit提供支持")
