@@ -90,20 +90,37 @@ def generate_vector_image(prompt):
 
 def draw_selection_box(image, start_point, end_point):
     """在图像上绘制选择框"""
-    draw = ImageDraw.Draw(image)
+    # Create a copy of the image to avoid modifying the original
+    img_copy = image.copy()
+    draw = ImageDraw.Draw(img_copy)
+    
+    # Ensure coordinates are properly formatted for rectangle drawing
+    x1, y1 = start_point
+    x2, y2 = end_point
+    
+    # Draw the outline with proper coordinates
     draw.rectangle(
-        [start_point, end_point],
-        outline="red",
+        [(x1, y1), (x2, y2)],
+        outline=(255, 0, 0),  # Red outline
         width=3
     )
-    # 添加半透明填充
-    overlay = Image.new('RGBA', image.size, (0, 0, 0, 0))
+    
+    # Create a separate transparent overlay for the fill
+    overlay = Image.new('RGBA', img_copy.size, (0, 0, 0, 0))
     draw_overlay = ImageDraw.Draw(overlay)
+    
+    # Draw the semi-transparent fill
     draw_overlay.rectangle(
-        [start_point, end_point],
-        fill=(255, 0, 0, 50)  # 红色，50%透明度
+        [(x1, y1), (x2, y2)],
+        fill=(255, 0, 0, 50)  # Red with 50% transparency
     )
-    return Image.alpha_composite(image.convert('RGBA'), overlay)
+    
+    # Ensure both images are in RGBA mode before compositing
+    if img_copy.mode != 'RGBA':
+        img_copy = img_copy.convert('RGBA')
+    
+    # Composite the images
+    return Image.alpha_composite(img_copy, overlay)
 
 def get_selection_coordinates(start_point, end_point):
     """获取选择框的坐标和尺寸"""
