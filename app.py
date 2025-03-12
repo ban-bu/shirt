@@ -3,6 +3,7 @@ from PIL import Image
 import requests
 from io import BytesIO
 import cairosvg
+import os
 
 # 导入 streamlit-drawable-canvas
 from streamlit_drawable_canvas import st_canvas
@@ -32,7 +33,8 @@ def generate_vector_image(prompt: str):
         st.error(f"调用 API 时出错: {e}")
         return None
 
-    if resp and hasattr(resp, "data") and resp.data and hasattr(resp.data[0], "url"):
+    # 更新访问响应数据的方式，适配最新的OpenAI API
+    if resp and len(resp.data) > 0 and resp.data[0].url:
         image_url = resp.data[0].url
         try:
             image_resp = requests.get(image_url)
@@ -57,11 +59,12 @@ def generate_vector_image(prompt: str):
 
 st.title("可自由拖动图案位置的个性化衣服定制")
 
-# 1. 加载衬衫底图（作为背景图，传递给 st_canvas 时直接使用 PIL Image）
+# 1. 加载衬衫底图（使用绝对路径）
+shirt_path = "/Users/wang/Desktop/T-shirt/white_shirt.png"
 try:
-    shirt_image = Image.open("white_shirt.png").convert("RGBA")
+    shirt_image = Image.open(shirt_path).convert("RGBA")
 except Exception as e:
-    st.error(f"无法加载 white_shirt.png：{e}")
+    st.error(f"无法加载衬衫图片：{e}")
     st.stop()
 
 # 2. 在 session_state 中存储生成好的设计图
@@ -84,9 +87,10 @@ if st.button("生成设计图"):
             f"Style: {style}. "
             f"Colors: {colors}. "
             f"Details: {details}. "
-            f"Make it visually appealing."
+            f"Make it visually appealing with transparent background."
         )
-        design_img = generate_vector_image(prompt_text)
+        with st.spinner("正在生成设计图..."):
+            design_img = generate_vector_image(prompt_text)
         if design_img:
             st.session_state["design_img"] = design_img
             st.success("设计图已生成，请在下方画布上绘制矩形来放置图案。")
@@ -135,11 +139,16 @@ if st.button("叠加图案到衣服"):
                 # 将图案贴到衬衫底图
                 composite = shirt_image.copy()
                 try:
+                    # 确保使用透明通道进行粘贴
                     composite.paste(scaled_design, (left, top), scaled_design)
+                    st.image(composite, caption="最终定制效果", use_column_width=True)
+                    
+                    # 提供保存选项
+                    if st.button("保存定制效果"):
+                        save_path = "/Users/wang/Desktop/T-shirt/custom_tshirt.png"
+                        composite.save(save_path)
+                        st.success(f"定制效果已保存至: {save_path}")
                 except Exception as e:
-                    st.warning(f"粘贴图案时出现问题：{e}")
-                    composite.paste(scaled_design, (left, top))
-
-                st.image(composite, caption="最终定制效果", use_column_width=True)
+                    st.error(f"粘贴图案时出现问题：{e}")
         else:
             st.warning("未检测到任何绘制数据。")
