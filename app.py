@@ -98,12 +98,22 @@ def draw_selection_box(image, start_point, end_point):
     x1, y1 = start_point
     x2, y2 = end_point
     
-    # 绘制轮廓 - 不使用width参数，而是绘制多个矩形来模拟粗线条
-    for i in range(3):  # 绘制3像素宽的边框
-        draw.rectangle(
-            [(x1-i, y1-i), (x2+i, y2+i)],
-            outline=(255, 0, 0)  # 红色轮廓
-        )
+    # 简单绘制红色轮廓，不使用width参数
+    draw.rectangle(
+        [(x1, y1), (x2, y2)],
+        outline=(255, 0, 0)  # 红色轮廓
+    )
+    
+    # 为了加粗边框，绘制多个偏移的矩形
+    draw.rectangle(
+        [(x1-1, y1-1), (x2+1, y2+1)],
+        outline=(255, 0, 0)
+    )
+    
+    draw.rectangle(
+        [(x1-2, y1-2), (x2+2, y2+2)],
+        outline=(255, 0, 0)
+    )
     
     # 创建单独的透明覆盖层用于填充
     overlay = Image.new('RGBA', img_copy.size, (0, 0, 0, 0))
@@ -120,7 +130,12 @@ def draw_selection_box(image, start_point, end_point):
         img_copy = img_copy.convert('RGBA')
     
     # 合成图像
-    return Image.alpha_composite(img_copy, overlay)
+    try:
+        return Image.alpha_composite(img_copy, overlay)
+    except Exception as e:
+        st.warning(f"图像合成失败: {e}")
+        # 如果合成失败，至少返回带边框的图像
+        return img_copy
 
 def get_selection_coordinates(start_point, end_point):
     """获取选择框的坐标和尺寸"""
