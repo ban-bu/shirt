@@ -88,17 +88,25 @@ def generate_vector_image(prompt):
         st.error("未能从 API 响应中获取图像 URL。")
     return None
 
-def draw_selection_box(image, start_point):
+def draw_selection_box(image, point=None):
     """在图像上绘制固定大小的选择框"""
     # 创建图像副本以避免修改原始图像
     img_copy = image.copy()
     draw = ImageDraw.Draw(img_copy)
     
-    # 固定框的大小 (1024 * 0.3)
-    box_size = int(1024 * 0.3)
+    # 固定框的大小 (1024 * 0.25)
+    box_size = int(1024 * 0.25)
     
-    # 计算结束点（基于固定大小）
-    x1, y1 = start_point
+    # 如果没有指定位置，则放在图片中心
+    if point is None:
+        x1 = (image.width - box_size) // 2
+        y1 = (image.height - box_size) // 2
+    else:
+        x1, y1 = point
+        # 确保选择框不会超出图片边界
+        x1 = max(0, min(x1 - box_size//2, image.width - box_size))
+        y1 = max(0, min(y1 - box_size//2, image.height - box_size))
+    
     x2, y2 = x1 + box_size, y1 + box_size
     
     # 绘制红色轮廓
@@ -124,15 +132,26 @@ def draw_selection_box(image, start_point):
     
     # 合成图像
     try:
-        return Image.alpha_composite(img_copy, overlay)
+        return Image.alpha_composite(img_copy, overlay), (x1, y1)
     except Exception as e:
         st.warning(f"图像合成失败: {e}")
-        return img_copy
+        return img_copy, (x1, y1)
 
-def get_selection_coordinates(start_point):
+def get_selection_coordinates(point=None, image_size=None):
     """获取固定大小选择框的坐标和尺寸"""
-    x1, y1 = start_point
-    box_size = int(1024 * 0.3)
+    box_size = int(1024 * 0.25)
+    
+    if point is None and image_size is not None:
+        width, height = image_size
+        x1 = (width - box_size) // 2
+        y1 = (height - box_size) // 2
+    else:
+        x1, y1 = point
+        # 确保选择框不会超出图片边界
+        if image_size:
+            width, height = image_size
+            x1 = max(0, min(x1 - box_size//2, width - box_size))
+            y1 = max(0, min(y1 - box_size//2, height - box_size))
     
     return (x1, y1, box_size, box_size)
 
@@ -145,6 +164,8 @@ if 'base_image' not in st.session_state:
     st.session_state.base_image = None
 if 'current_image' not in st.session_state:
     st.session_state.current_image = None
+if 'current_box_position' not in st.session_state:
+    st.session_state.current_box_position = None
 if 'generated_design' not in st.session_state:
     st.session_state.generated_design = None
 if 'final_design' not in st.session_state:
@@ -165,7 +186,10 @@ with col1:
         try:
             base_image = Image.open("white_shirt.png").convert("RGBA")
             st.session_state.base_image = base_image
-            st.session_state.current_image = base_image.copy()
+            # 初始化时在中心绘制选择框
+            initial_image, initial_pos = draw_selection_box(base_image)
+            st.session_state.current_image = initial_image
+            st.session_state.current_box_position = initial_pos
         except Exception as e:
             st.error(f"加载白衬衫图片时出错: {e}")
             st.stop()
@@ -173,8 +197,13 @@ with col1:
     # 选择模式按钮
     if st.button("🖱️ " + ("退出选择模式" if st.session_state.selection_mode else "进入选择模式")):
         st.session_state.selection_mode = not st.session_state.selection_mode
-        st.session_state.start_point = None
-        st.session_state.end_point = None
+        if not st.session_state.selection_mode:
+            # 退出选择模式时，如果没有确认的选区，则恢复到中心位置
+            if not st.session_state.selection_areas:
+                temp_image, center_pos = draw_selection_box(st.session_state.base_image)
+                st.session_state.current_image = temp_image
+                st.session_state.current_box_position = center_pos
+        st.rerun()
     
     # 显示当前模式
     st.markdown(f"**当前模式:** {'<span class=\"highlight-text\">选择区域模式</span>' if st.session_state.selection_mode else '浏览模式'}", unsafe_allow_html=True)
@@ -193,18 +222,21 @@ with col1:
     # 处理选择区域逻辑
     if st.session_state.selection_mode and coordinates:
         # 更新当前鼠标位置的选择框
-        temp_image = st.session_state.base_image.copy()
-        
-        # 绘制当前跟随鼠标的选择框
         current_point = (coordinates["x"], coordinates["y"])
-        temp_image = draw_selection_box(temp_image, current_point)
-        
+        temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
         st.session_state.current_image = temp_image
+        st.session_state.current_box_position = new_pos
         
         # 当点击时添加/更新选择区域
         if st.button("📌 确认选择区域"):
-            st.session_state.selection_areas = [get_selection_coordinates(current_point)]  # 只保留一个区域
+            st.session_state.selection_areas = [get_selection_coordinates(
+                st.session_state.current_box_position, 
+                (st.session_state.base_image.width, st.session_state.base_image.height)
+            )]
             st.rerun()
+    
+    # 显示当前图像
+    st.image(st.session_state.current_image, use_column_width=True)
     
     # 显示已选择的区域状态
     if st.session_state.selection_areas:
@@ -213,7 +245,10 @@ with col1:
         # 清除选择按钮
         if st.button("🗑️ 清除选择区域"):
             st.session_state.selection_areas = []
-            st.session_state.current_image = st.session_state.base_image.copy()
+            # 清除选择后恢复到中心位置
+            temp_image, center_pos = draw_selection_box(st.session_state.base_image)
+            st.session_state.current_image = temp_image
+            st.session_state.current_box_position = center_pos
             st.rerun()
 
 with col2:
