@@ -98,21 +98,11 @@ def draw_selection_box(image, start_point, end_point):
     x1, y1 = start_point
     x2, y2 = end_point
     
-    # 简单绘制红色轮廓，不使用width参数
+    # 绘制红色轮廓
     draw.rectangle(
         [(x1, y1), (x2, y2)],
-        outline=(255, 0, 0)  # 红色轮廓
-    )
-    
-    # 为了加粗边框，绘制多个偏移的矩形
-    draw.rectangle(
-        [(x1-1, y1-1), (x2+1, y2+1)],
-        outline=(255, 0, 0)
-    )
-    
-    draw.rectangle(
-        [(x1-2, y1-2), (x2+2, y2+2)],
-        outline=(255, 0, 0)
+        outline=(255, 0, 0),
+        width=2  # 设置线条宽度
     )
     
     # 创建单独的透明覆盖层用于填充
