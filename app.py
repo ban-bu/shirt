@@ -16,6 +16,8 @@ import json
 
 # Requires installation: pip install streamlit-image-coordinates
 from streamlit_image_coordinates import streamlit_image_coordinates
+from streamlit_drawable_canvas import st_canvas
+import cv2
 
 # ========== Deepbricks Configuration ==========
 from openai import OpenAI
@@ -507,7 +509,7 @@ def show_ai_design_page():
             else:
                 # Generate pattern
                 prompt_text = (
-                    f"Create a decorative pattern without background. "
+                    f"Create a decorative pattern with a completely transparent background. "
                     f"Theme: {theme}. "
                     f"Style: {style}. "
                     f"Colors: {colors}. "
@@ -580,114 +582,124 @@ def show_ai_design_page():
         st.session_state.page = "welcome"
         st.rerun()
 
-# Preset Design Group design page
-def show_preset_design_page():
-    st.title("👕 Preset Design Experiment Platform")
-    st.markdown("### Preset Design Group - Choose Your Favorite T-shirt Design")
-    
-    # Create two-column layout
-    col1, col2 = st.columns([3, 2])
-    
-    with col1:
-        st.markdown("## Design Area")
+# Add a function to create colored t-shirt
+def create_colored_tshirt(color_hex):
+    """Create a t-shirt with specified color"""
+    try:
+        # Load the base white shirt image
+        base_shirt = Image.open("white_shirt.png").convert("RGBA")
         
-        # Load T-shirt base image
-        if st.session_state.base_image is None:
+        # Convert hex color to RGB
+        color_rgb = tuple(int(color_hex.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+        
+        # Create a colored overlay
+        colored_overlay = Image.new("RGBA", base_shirt.size, color=(*color_rgb, 180))
+        
+        # Create a mask from the original shirt (white areas become transparent)
+        r, g, b, a = base_shirt.split()
+        mask = Image.merge("L", (a,))
+        
+        # Apply the colored overlay to the shirt using the mask
+        colored_shirt = Image.new("RGBA", base_shirt.size)
+        colored_shirt.paste(base_shirt, (0, 0))
+        colored_shirt.paste(colored_overlay, (0, 0), mask)
+        
+        return colored_shirt
+    except Exception as e:
+        st.error(f"Error creating colored t-shirt: {e}")
+        return None
+
+# Update the preset design page to allow color selection and custom drawing
+def show_preset_design_page():
+    st.title("👕 Custom Design Experiment Platform")
+    st.markdown("### Custom Design Group - Create Your Own T-shirt Design")
+    
+    # Create tabbed interface for color selection and drawing
+    tab1, tab2 = st.tabs(["T-shirt Color", "Draw Your Design"])
+    
+    with tab1:
+        st.markdown("## Choose T-shirt Color")
+        
+        # Color picker for t-shirt
+        color = st.color_picker("Select a color for your t-shirt", "#FFFFFF")
+        
+        if st.button("Apply Color"):
+            # Create colored t-shirt
+            colored_shirt = create_colored_tshirt(color)
+            if colored_shirt:
+                st.session_state.base_image = colored_shirt
+                st.session_state.current_image = colored_shirt.copy()
+                st.success("Color applied successfully!")
+                st.rerun()
+    
+    with tab2:
+        st.markdown("## Draw Your Design")
+        
+        # Display the current t-shirt
+        if st.session_state.base_image is not None:
+            st.image(st.session_state.base_image, caption="Your T-shirt", use_container_width=True)
+        else:
             try:
                 base_image = Image.open("white_shirt.png").convert("RGBA")
                 st.session_state.base_image = base_image
-                # Initialize by drawing selection box in the center
-                initial_image, initial_pos = draw_selection_box(base_image)
-                st.session_state.current_image = initial_image
-                st.session_state.current_box_position = initial_pos
+                st.session_state.current_image = base_image.copy()
+                st.image(base_image, caption="Default White T-shirt", use_container_width=True)
             except Exception as e:
                 st.error(f"Error loading white T-shirt image: {e}")
                 st.stop()
         
-        st.markdown("**👇 Click anywhere on the T-shirt to move the design frame**")
+        # Drawing canvas settings
+        st.markdown("### Draw Pattern Below")
+        stroke_width = st.slider("Brush Width", 1, 25, 3)
+        stroke_color = st.color_picker("Brush Color", "#000000")
+        bg_color = st.color_picker("Background Color", "#FFFFFF")
+        bg_opacity = st.slider("Background Opacity", 0.0, 1.0, 0.1)
         
-        # Display current image and get click coordinates
-        current_image = st.session_state.current_image
-        coordinates = streamlit_image_coordinates(
-            current_image,
-            key="shirt_image"
+        # Create a transparent canvas for drawing
+        canvas_result = st_canvas(
+            fill_color=f"rgba(255, 255, 255, {bg_opacity})",
+            stroke_width=stroke_width,
+            stroke_color=stroke_color,
+            background_color=bg_color,
+            height=300,
+            width=400,
+            drawing_mode="freedraw",
+            key="canvas",
         )
         
-        # Handle selection area logic - simplify to directly move red box
-        if coordinates:
-            # Update selection box at current mouse position
-            current_point = (coordinates["x"], coordinates["y"])
-            temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
-            st.session_state.current_image = temp_image
-            st.session_state.current_box_position = new_pos
-            st.rerun()
-
-    with col2:
-        st.markdown("## Choose Preset Design")
-        
-        # Display preset design image options
-        st.markdown("Select one from the designs below:")
-        
-        # Get all images from predesign folder
-        predesign_folder = "predesign"
-        design_files = []
-        
-        # Ensure folder exists
-        if not os.path.exists(predesign_folder):
-            st.error(f"Preset design folder not found: {predesign_folder}, please make sure it exists.")
-        else:
-            # Get all supported image files
-            for file in os.listdir(predesign_folder):
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    design_files.append(file)
+        # Apply drawing to t-shirt
+        if canvas_result.image_data is not None and st.button("Apply Drawing to T-shirt"):
+            # Convert the canvas data to an image with transparency
+            canvas_img = canvas_result.image_data
             
-            if not design_files:
-                st.warning(f"No image files found in the {predesign_folder} folder.")
-            else:
-                # Display image selection interface
-                selected_file = st.radio(
-                    "Available designs",
-                    options=design_files,
-                    horizontal=True
-                )
+            # Create PIL image from canvas data
+            canvas_pil = Image.fromarray(canvas_img.astype('uint8'), 'RGBA')
+            
+            # Make white/background color transparent
+            data = np.array(canvas_pil)
+            # Create mask for nearly white pixels (adjust threshold as needed)
+            mask = (data[:,:,0] > 240) & (data[:,:,1] > 240) & (data[:,:,2] > 240)
+            # Set alpha channel to 0 for background pixels
+            data[:,:,3] = np.where(mask, 0, 255)
+            transparent_canvas = Image.fromarray(data)
+            
+            # Apply the drawing to the t-shirt
+            if st.session_state.base_image is not None:
+                composite = st.session_state.base_image.copy()
+                # Center the drawing on the t-shirt (adjust position as needed)
+                paste_x = (composite.width - transparent_canvas.width) // 2
+                paste_y = composite.height // 3  # Position near the chest area
                 
-                st.session_state.selected_preset = selected_file
-                
-                # Display selected design
-                if st.session_state.selected_preset:
-                    try:
-                        # Load design image
-                        design_path = os.path.join(predesign_folder, selected_file)
-                        preset_design = Image.open(design_path).convert("RGBA")
-                        st.image(preset_design, caption=f"Preset Design: {selected_file}", use_container_width=True)
-                        
-                        # Apply design button
-                        if st.button("Apply to T-shirt"):
-                            st.session_state.generated_design = preset_design
-                            
-                            # Composite on original image
-                            composite_image = st.session_state.base_image.copy()
-                            
-                            # Place design at current selection position
-                            left, top = st.session_state.current_box_position
-                            box_size = int(1024 * 0.25)
-                            
-                            # Scale preset pattern to selection area size
-                            scaled_design = preset_design.resize((box_size, box_size), Image.LANCZOS)
-                            
-                            try:
-                                # Ensure transparency channel is used for pasting
-                                composite_image.paste(scaled_design, (left, top), scaled_design)
-                            except Exception as e:
-                                st.warning(f"Transparent channel paste failed, direct paste: {e}")
-                                composite_image.paste(scaled_design, (left, top))
-                            
-                            st.session_state.final_design = composite_image
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Error processing preset design: {e}")
+                try:
+                    # Paste with transparency
+                    composite.paste(transparent_canvas, (paste_x, paste_y), transparent_canvas)
+                    st.session_state.final_design = composite
+                    st.success("Drawing applied to t-shirt!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error applying drawing: {e}")
     
-    # Display final effect - maintain consistent layout with AI customization page
+    # Display final design if available
     if st.session_state.final_design is not None:
         st.markdown("### Final Result")
         st.image(st.session_state.final_design, use_container_width=True)
@@ -711,7 +723,7 @@ def show_preset_design_page():
                 st.session_state.page = "survey"
                 st.rerun()
 
-    # Return to main interface button - modified here
+    # Return to main interface button
     if st.button("Return to Main Page"):
         # Clear all design-related states
         st.session_state.base_image = None
@@ -719,7 +731,7 @@ def show_preset_design_page():
         st.session_state.current_box_position = None
         st.session_state.generated_design = None
         st.session_state.final_design = None
-        st.session_state.selected_preset = None  # Clear selected preset design
+        st.session_state.selected_preset = None
         # Only change page state, retain user info and experiment group
         st.session_state.page = "welcome"
         st.rerun()
