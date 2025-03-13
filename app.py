@@ -567,8 +567,15 @@ def show_ai_design_page():
                 st.session_state.page = "survey"
                 st.rerun()
     
-    # 返回主界面按钮 - 单独一行，与AI定制页面一致
+    # 返回主界面按钮 - 修改此处
     if st.button("返回主界面"):
+        # 清空所有设计相关状态
+        st.session_state.base_image = None
+        st.session_state.current_image = None
+        st.session_state.current_box_position = None
+        st.session_state.generated_design = None
+        st.session_state.final_design = None
+        # 只改变页面状态，保留用户信息和实验组别
         st.session_state.page = "welcome"
         st.rerun()
 
@@ -703,8 +710,16 @@ def show_preset_design_page():
                 st.session_state.page = "survey"
                 st.rerun()
 
-    # 返回主界面按钮 - 单独一行，与AI定制页面一致
+    # 返回主界面按钮 - 修改此处
     if st.button("返回主界面"):
+        # 清空所有设计相关状态
+        st.session_state.base_image = None
+        st.session_state.current_image = None
+        st.session_state.current_box_position = None
+        st.session_state.generated_design = None
+        st.session_state.final_design = None
+        st.session_state.selected_preset = None  # 清空已选的预设设计
+        # 只改变页面状态，保留用户信息和实验组别
         st.session_state.page = "welcome"
         st.rerun()
 
@@ -851,11 +866,20 @@ def show_survey_page():
         st.success("您已成功提交问卷！感谢您的参与。")
         
         if st.button("返回主界面"):
-            # 重置会话状态
-            for key in list(st.session_state.keys()):
-                if key != 'user_id':  # 保留用户ID以便跟踪
+            # 重置会话状态，保留用户ID和实验数据
+            design_keys = [
+                'base_image', 'current_image', 'current_box_position', 
+                'generated_design', 'final_design', 'selected_preset',
+                'page', 'experiment_group', 'submitted', 'start_time'
+            ]
+            for key in design_keys:
+                if key in st.session_state:
                     del st.session_state[key]
+            
+            # 重新初始化必要的状态
             st.session_state.page = "welcome"
+            st.session_state.start_time = datetime.datetime.now()
+            st.session_state.submitted = False
             st.rerun()
 
 # 主程序控制逻辑
