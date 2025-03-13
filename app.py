@@ -396,7 +396,6 @@ def show_welcome_page():
             }
             st.session_state.page = "design"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # 管理员区域 - 实验数据分析（通过密码保护）
     st.markdown("---")
@@ -632,12 +631,14 @@ def show_preset_design_page():
         if st.session_state.selected_preset:
             st.markdown(f"### 已选择: {st.session_state.selected_preset}")
             
+            # 获取预设设计图片
+            design_url = PRESET_DESIGNS[st.session_state.selected_preset]
+            
             try:
-                # 使用本地预设设计图片
-                preset_design_path = f"preset_designs/{st.session_state.selected_preset}.png"
-                # 检查文件是否存在
-                if os.path.exists(preset_design_path):
-                    preset_design = Image.open(preset_design_path).convert("RGBA")
+                # 下载预设设计图片
+                response = requests.get(design_url)
+                if response.status_code == 200:
+                    preset_design = Image.open(BytesIO(response.content)).convert("RGBA")
                     st.image(preset_design, caption="预设设计", use_column_width=True)
                     
                     # 应用设计按钮
@@ -664,11 +665,11 @@ def show_preset_design_page():
                         st.session_state.final_design = composite_image
                         st.rerun()
                 else:
-                    st.error(f"找不到预设设计图片: {preset_design_path}")
+                    st.error(f"无法加载预设设计图片，错误码：{response.status_code}")
             except Exception as e:
                 st.error(f"处理预设设计时出错: {e}")
     
-    # 显示最终效果
+    # 显示最终效果 - 移出col2，确保在页面底部显示
     if st.session_state.final_design is not None:
         st.markdown("### 最终效果")
         st.image(st.session_state.final_design, use_column_width=True)
@@ -684,12 +685,14 @@ def show_preset_design_page():
             mime="image/png"
         )
         
-        # 确认完成按钮
+        # 添加确认完成按钮，点击后跳转到问卷页面
         if st.button("确认完成"):
             st.session_state.page = "survey"
             st.rerun()
 
-        # 返回主界面按钮
+    # 返回主界面按钮 - 放在页面最底部
+    col1, col2 = st.columns([1, 1])
+    with col2:
         if st.button("返回主界面"):
             st.session_state.page = "welcome"
             st.rerun()
