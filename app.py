@@ -478,14 +478,14 @@ def show_ai_design_page():
             if not theme.strip():
                 st.warning("请至少输入主题或关键词！")
             else:
-                # 生成图案
+                # 生成图案的提示词只请求图案
                 prompt_text = (
-                    f"Create a unique T-shirt design. "
+                    f"Create a unique floral design. "
                     f"Theme: {theme}. "
                     f"Style: {style}. "
                     f"Colors: {colors}. "
                     f"Details: {details}. "
-                    f"Make it visually appealing with transparent background."
+                    f"Make it visually appealing with a transparent background."
                 )
                 
                 with st.spinner("🔮 正在生成设计图..."):
@@ -515,11 +515,6 @@ def show_ai_design_page():
                         st.rerun()
                     else:
                         st.error("生成图像失败，请稍后重试。")
-        
-        # 显示生成的设计
-        if st.session_state.generated_design is not None:
-            st.markdown("### 生成的原始设计")
-            st.image(st.session_state.generated_design, use_column_width=True)
         
         # 显示最终效果
         if st.session_state.final_design is not None:
