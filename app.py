@@ -273,79 +273,6 @@ if 'selected_preset' not in st.session_state:
 # 确保数据文件存在
 initialize_experiment_data()
 
-# 添加更强大的背景移除函数
-def remove_background_advanced(image):
-    """使用更高级的方法移除图像背景"""
-    # 确保图像是RGBA模式
-    img = image.convert("RGBA")
-    
-    # 获取图像数据
-    datas = img.getdata()
-    
-    # 创建新图像数据
-    new_data = []
-    
-    # 棋盘格和灰色背景的检测变量
-    is_checkboard = False
-    first_row_pattern = []
-    
-    # 检查是否是棋盘格背景（检查第一行像素的模式）
-    for i in range(min(20, img.width)):
-        first_row_pattern.append(datas[i][0:3])
-    
-    # 如果存在交替的颜色模式，可能是棋盘格
-    alternating_pattern = True
-    for i in range(2, len(first_row_pattern)):
-        if i % 2 == 0 and first_row_pattern[i] != first_row_pattern[0]:
-            alternating_pattern = False
-        if i % 2 == 1 and first_row_pattern[i] != first_row_pattern[1]:
-            alternating_pattern = False
-    
-    is_checkboard = alternating_pattern and first_row_pattern[0] != first_row_pattern[1]
-    
-    # 如果检测到棋盘格，使用更激进的背景移除
-    if is_checkboard:
-        # 找出棋盘格的两种颜色
-        color1 = first_row_pattern[0]
-        color2 = first_row_pattern[1]
-        
-        for item in datas:
-            # 如果像素接近棋盘格颜色，则设为透明
-            if (abs(item[0] - color1[0]) < 30 and 
-                abs(item[1] - color1[1]) < 30 and 
-                abs(item[2] - color1[2]) < 30) or \
-               (abs(item[0] - color2[0]) < 30 and 
-                abs(item[1] - color2[1]) < 30 and 
-                abs(item[2] - color2[2]) < 30):
-                new_data.append((255, 255, 255, 0))  # 完全透明
-            else:
-                # 保留原像素
-                new_data.append(item)
-    else:
-        # 一般的背景移除方法（针对灰色/浅色背景）
-        for item in datas:
-            # 检测浅灰色背景 - 使用多条件
-            r, g, b, a = item
-            
-            # 条件1: 灰色检测 (r,g,b值接近)
-            is_gray = abs(r - g) < 15 and abs(r - b) < 15 and abs(g - b) < 15
-            
-            # 条件2: 浅色检测
-            is_light = r > 200 and g > 200 and b > 200
-            
-            # 条件3: 中灰色检测
-            is_mid_gray = (100 < r < 200 and 100 < g < 200 and 100 < b < 200) and is_gray
-            
-            if (is_gray and is_light) or is_mid_gray:
-                new_data.append((255, 255, 255, 0))  # 完全透明
-            else:
-                # 保留原像素
-                new_data.append(item)
-    
-    # 更新图像数据
-    img.putdata(new_data)
-    return img
-
 # 欢迎与信息收集页面
 def show_welcome_page():
     st.title("👕 AI定制服装消费者行为实验平台")
@@ -499,112 +426,95 @@ def show_welcome_page():
 def show_ai_design_page():
     st.title("👕 AI定制服装实验平台")
     st.markdown("### AI定制组 - 创建您独特的T恤设计")
-
-# 创建两列布局
-col1, col2 = st.columns([3, 2])
-
-with col1:
-    st.markdown("## 设计区域")
     
-    # 加载衬衫底图
-    if st.session_state.base_image is None:
-        try:
-            base_image = Image.open("white_shirt.png").convert("RGBA")
-            st.session_state.base_image = base_image
-            # 初始化时在中心绘制选择框
-            initial_image, initial_pos = draw_selection_box(base_image)
-            st.session_state.current_image = initial_image
-            st.session_state.current_box_position = initial_pos
-        except Exception as e:
-            st.error(f"加载白衬衫图片时出错: {e}")
-            st.stop()
+    # 创建两列布局
+    col1, col2 = st.columns([3, 2])
     
+    with col1:
+        st.markdown("## 设计区域")
+        
+        # 加载衬衫底图
+        if st.session_state.base_image is None:
+            try:
+                base_image = Image.open("white_shirt.png").convert("RGBA")
+                st.session_state.base_image = base_image
+                # 初始化时在中心绘制选择框
+                initial_image, initial_pos = draw_selection_box(base_image)
+                st.session_state.current_image = initial_image
+                st.session_state.current_box_position = initial_pos
+            except Exception as e:
+                st.error(f"加载白衬衫图片时出错: {e}")
+                st.stop()
+        
         st.markdown("**👇 点击T恤上的任意位置来移动设计框**")
-    
-    # 显示当前图像并获取点击坐标
-    current_image = st.session_state.current_image
-    coordinates = streamlit_image_coordinates(
-        current_image,
-        key="shirt_image"
-    )
-    
+        
+        # 显示当前图像并获取点击坐标
+        current_image = st.session_state.current_image
+        coordinates = streamlit_image_coordinates(
+            current_image,
+            key="shirt_image"
+        )
+        
         # 处理选择区域逻辑 - 简化为直接移动红框
         if coordinates:
-        # 更新当前鼠标位置的选择框
-        current_point = (coordinates["x"], coordinates["y"])
-        temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
-        st.session_state.current_image = temp_image
-        st.session_state.current_box_position = new_pos
+            # 更新当前鼠标位置的选择框
+            current_point = (coordinates["x"], coordinates["y"])
+            temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
+            st.session_state.current_image = temp_image
+            st.session_state.current_box_position = new_pos
             st.rerun()
 
-with col2:
-    st.markdown("## 设计参数")
-    
-    # 用户输入个性化参数
-    theme = st.text_input("主题或关键词 (必填)", "花卉图案")
-    style = st.text_input("设计风格", "abstract")
-    colors = st.text_input("偏好颜色", "pink, gold")
-    details = st.text_area("更多细节", "some swirling shapes")
-    
-    # 生成设计按钮
+    with col2:
+        st.markdown("## 设计参数")
+        
+        # 用户输入个性化参数
+        theme = st.text_input("主题或关键词 (必填)", "花卉图案")
+        style = st.text_input("设计风格", "abstract")
+        colors = st.text_input("偏好颜色", "pink, gold")
+        details = st.text_area("更多细节", "some swirling shapes")
+        
+        # 生成设计按钮
         if st.button("🎨 生成AI设计"):
-        if not theme.strip():
-            st.warning("请至少输入主题或关键词！")
-        else:
-                # 更新提示词以强调透明背景
-            prompt_text = (
-                    f"Create a decorative pattern with completely transparent background. "
-                f"Theme: {theme}. "
-                f"Style: {style}. "
-                f"Colors: {colors}. "
-                f"Details: {details}. "
-                    f"IMPORTANT: The image must have NO BACKGROUND, only the design elements. "
-                    f"The pattern must be isolated on transparency with absolutely no gray background."
-            )
-            
-            with st.spinner("🔮 正在生成设计图..."):
-                custom_design = generate_vector_image(prompt_text)
+            if not theme.strip():
+                st.warning("请至少输入主题或关键词！")
+            else:
+                # 生成图案
+                prompt_text = (
+                    f"Create a unique floral design with a transparent background. "
+                    f"Theme: {theme}. "
+                    f"Style: {style}. "
+                    f"Colors: {colors}. "
+                    f"Details: {details}."
+                )
                 
-                if custom_design:
-                        # 应用强化的背景移除处理
-                        custom_design = remove_background_advanced(custom_design)
-                    st.session_state.generated_design = custom_design
+                with st.spinner("🔮 正在生成设计图..."):
+                    custom_design = generate_vector_image(prompt_text)
                     
-                    # 在原图上合成
-                    composite_image = st.session_state.base_image.copy()
-                    
+                    if custom_design:
+                        st.session_state.generated_design = custom_design
+                        
+                        # 在原图上合成
+                        composite_image = st.session_state.base_image.copy()
+                        
                         # 将设计图放置到当前选择位置
                         left, top = st.session_state.current_box_position
                         box_size = int(1024 * 0.25)
                         
                         # 将生成图案缩放到选择区域大小
                         scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
-                            
-                            try:
-                                # 确保使用透明通道进行粘贴
-                                composite_image.paste(scaled_design, (left, top), scaled_design)
-                            except Exception as e:
-                            st.warning(f"使用透明通道粘贴失败，尝试替代方法: {e}")
-                            
-                            # 替代方法：再次确认透明度
-                            try:
-                                # 确保图像为RGBA模式
-                                scaled_design = scaled_design.convert("RGBA")
-                                composite_image = composite_image.convert("RGBA")
-                                
-                                # 使用alpha通道作为蒙版
-                                alpha = scaled_design.split()[3]
-                                composite_image.paste(scaled_design, (left, top), mask=alpha)
-                            except Exception as e2:
-                                st.warning(f"替代透明度处理失败: {e2}")
-                                # 最后的尝试：直接粘贴
-                                composite_image.paste(scaled_design, (left, top))
-                    
-                    st.session_state.final_design = composite_image
-                    st.rerun()
-                else:
-                    st.error("生成图像失败，请稍后重试。")
-
+                        
+                        try:
+                            # 确保使用透明通道进行粘贴
+                            composite_image.paste(scaled_design, (left, top), scaled_design)
+                        except Exception as e:
+                            st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
+                            composite_image.paste(scaled_design, (left, top))
+                        
+                        st.session_state.final_design = composite_image
+                        st.rerun()
+                    else:
+                        st.error("生成图像失败，请稍后重试。")
+        
         # 显示最终效果
         if st.session_state.final_design is not None:
             st.markdown("### 最终效果")
