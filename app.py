@@ -16,7 +16,7 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 
 # ========== Deepbricks 配置信息 ==========
 from openai import OpenAI
-API_KEY = st.secrets["API_KEY"] if "API_KEY" in st.secrets else "YOUR_API_KEY"
+API_KEY = "sk-lNVAREVHjj386FDCd9McOL7k66DZCUkTp6IbV0u9970qqdlg"
 BASE_URL = "https://api.deepbricks.ai/v1/"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 # ==============================================
