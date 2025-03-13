@@ -1,8 +1,6 @@
 import streamlit as st
 import warnings
 warnings.filterwarnings('ignore')
-st.set_option('deprecation.showPyplotGlobalUse', False)
-st.set_option('deprecation.showfileUploaderEncoding', False)
 
 from PIL import Image, ImageDraw
 import requests
