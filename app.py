@@ -504,7 +504,7 @@ def show_ai_design_page():
             else:
                 # 生成图案
                 prompt_text = (
-                    f"Create a decorative pattern with a completely transparent background. "
+                    f"Create a decorative pattern with a white background. "
                     f"Theme: {theme}. "
                     f"Style: {style}. "
                     f"Colors: {colors}. "
