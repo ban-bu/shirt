@@ -426,96 +426,128 @@ def show_welcome_page():
 def show_ai_design_page():
     st.title("👕 AI定制服装实验平台")
     st.markdown("### AI定制组 - 创建您独特的T恤设计")
+
+# 创建两列布局
+col1, col2 = st.columns([3, 2])
+
+with col1:
+    st.markdown("## 设计区域")
     
-    # 创建两列布局
-    col1, col2 = st.columns([3, 2])
+    # 加载衬衫底图
+    if st.session_state.base_image is None:
+        try:
+            base_image = Image.open("white_shirt.png").convert("RGBA")
+            st.session_state.base_image = base_image
+            # 初始化时在中心绘制选择框
+            initial_image, initial_pos = draw_selection_box(base_image)
+            st.session_state.current_image = initial_image
+            st.session_state.current_box_position = initial_pos
+        except Exception as e:
+            st.error(f"加载白衬衫图片时出错: {e}")
+            st.stop()
     
-    with col1:
-        st.markdown("## 设计区域")
-        
-        # 加载衬衫底图
-        if st.session_state.base_image is None:
-            try:
-                base_image = Image.open("white_shirt.png").convert("RGBA")
-                st.session_state.base_image = base_image
-                # 初始化时在中心绘制选择框
-                initial_image, initial_pos = draw_selection_box(base_image)
-                st.session_state.current_image = initial_image
-                st.session_state.current_box_position = initial_pos
-            except Exception as e:
-                st.error(f"加载白衬衫图片时出错: {e}")
-                st.stop()
-        
         st.markdown("**👇 点击T恤上的任意位置来移动设计框**")
-        
-        # 显示当前图像并获取点击坐标
-        current_image = st.session_state.current_image
-        coordinates = streamlit_image_coordinates(
-            current_image,
-            key="shirt_image"
-        )
-        
+    
+    # 显示当前图像并获取点击坐标
+    current_image = st.session_state.current_image
+    coordinates = streamlit_image_coordinates(
+        current_image,
+        key="shirt_image"
+    )
+    
         # 处理选择区域逻辑 - 简化为直接移动红框
         if coordinates:
-            # 更新当前鼠标位置的选择框
-            current_point = (coordinates["x"], coordinates["y"])
-            temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
-            st.session_state.current_image = temp_image
-            st.session_state.current_box_position = new_pos
+        # 更新当前鼠标位置的选择框
+        current_point = (coordinates["x"], coordinates["y"])
+        temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
+        st.session_state.current_image = temp_image
+        st.session_state.current_box_position = new_pos
             st.rerun()
 
-    with col2:
-        st.markdown("## 设计参数")
-        
-        # 用户输入个性化参数
-        theme = st.text_input("主题或关键词 (必填)", "花卉图案")
-        style = st.text_input("设计风格", "abstract")
-        colors = st.text_input("偏好颜色", "pink, gold")
-        details = st.text_area("更多细节", "some swirling shapes")
-        
-        # 生成设计按钮
+with col2:
+    st.markdown("## 设计参数")
+    
+    # 用户输入个性化参数
+    theme = st.text_input("主题或关键词 (必填)", "花卉图案")
+    style = st.text_input("设计风格", "abstract")
+    colors = st.text_input("偏好颜色", "pink, gold")
+    details = st.text_area("更多细节", "some swirling shapes")
+    
+    # 生成设计按钮
         if st.button("🎨 生成AI设计"):
-            if not theme.strip():
-                st.warning("请至少输入主题或关键词！")
-            else:
-                # 生成图案的提示词只请求图案
-                prompt_text = (
-                    f"Create a unique floral design. "
-                    f"Theme: {theme}. "
-                    f"Style: {style}. "
-                    f"Colors: {colors}. "
-                    f"Details: {details}. "
-                    f"Make it visually appealing with a transparent background."
-                )
+        if not theme.strip():
+            st.warning("请至少输入主题或关键词！")
+        else:
+                # 修改生成图案的提示词
+            prompt_text = (
+                    f"Create a decorative pattern with completely transparent background. "
+                f"Theme: {theme}. "
+                f"Style: {style}. "
+                f"Colors: {colors}. "
+                f"Details: {details}. "
+                    f"The pattern must have NO background, ONLY the design elements on transparency. "
+                    f"The output must be PNG with alpha channel transparency."
+            )
+            
+            with st.spinner("🔮 正在生成设计图..."):
+                custom_design = generate_vector_image(prompt_text)
                 
-                with st.spinner("🔮 正在生成设计图..."):
-                    custom_design = generate_vector_image(prompt_text)
+                if custom_design:
+                        # 添加背景处理函数
+                        def remove_background(image):
+                            """尝试移除或增强图像的透明背景"""
+                            # 转换为RGBA确保有透明通道
+                            img = image.convert("RGBA")
+                            
+                            # 获取图像数据
+                            datas = img.getdata()
+                            
+                            # 创建新图像数据列表
+                            newData = []
+                            
+                            # 设置背景检测的阈值
+                            threshold = 230  # 可能需要根据图像调整
+                            
+                            # 处理每个像素
+                            for item in datas:
+                                # 检查像素是否接近白色或灰色（背景色）
+                                if item[0] > threshold and item[1] > threshold and item[2] > threshold:
+                                    # 如果是浅色背景，则设置为完全透明
+                                    newData.append((255, 255, 255, 0))
+                                else:
+                                    # 否则保留原像素
+                                    newData.append(item)
+                            
+                            # 更新图像数据
+                            img.putdata(newData)
+                            return img
+
+                        # 处理生成的图像以增强透明度
+                        custom_design = remove_background(custom_design)
+                    st.session_state.generated_design = custom_design
                     
-                    if custom_design:
-                        st.session_state.generated_design = custom_design
-                        
-                        # 在原图上合成
-                        composite_image = st.session_state.base_image.copy()
-                        
+                    # 在原图上合成
+                    composite_image = st.session_state.base_image.copy()
+                    
                         # 将设计图放置到当前选择位置
                         left, top = st.session_state.current_box_position
                         box_size = int(1024 * 0.25)
                         
                         # 将生成图案缩放到选择区域大小
                         scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
-                        
-                        try:
-                            # 确保使用透明通道进行粘贴
-                            composite_image.paste(scaled_design, (left, top), scaled_design)
-                        except Exception as e:
-                            st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
-                            composite_image.paste(scaled_design, (left, top))
-                        
-                        st.session_state.final_design = composite_image
-                        st.rerun()
-                    else:
-                        st.error("生成图像失败，请稍后重试。")
-        
+                            
+                            try:
+                                # 确保使用透明通道进行粘贴
+                                composite_image.paste(scaled_design, (left, top), scaled_design)
+                            except Exception as e:
+                                st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
+                                composite_image.paste(scaled_design, (left, top))
+                    
+                    st.session_state.final_design = composite_image
+                    st.rerun()
+                else:
+                    st.error("生成图像失败，请稍后重试。")
+
         # 显示最终效果
         if st.session_state.final_design is not None:
             st.markdown("### 最终效果")
@@ -639,23 +671,23 @@ def show_preset_design_page():
                     st.error(f"无法加载预设设计图片，错误码：{response.status_code}")
             except Exception as e:
                 st.error(f"处理预设设计时出错: {e}")
+    
+    # 显示最终效果
+    if st.session_state.final_design is not None:
+        st.markdown("### 最终效果")
+        st.image(st.session_state.final_design, use_column_width=True)
         
-        # 显示最终效果
-        if st.session_state.final_design is not None:
-            st.markdown("### 最终效果")
-            st.image(st.session_state.final_design, use_column_width=True)
-            
-            # 提供下载选项
-            buf = BytesIO()
-            st.session_state.final_design.save(buf, format="PNG")
-            buf.seek(0)
-            st.download_button(
-                label="💾 下载定制效果",
-                data=buf,
-                file_name="custom_tshirt.png",
-                mime="image/png"
-            )
-        
+        # 提供下载选项
+        buf = BytesIO()
+        st.session_state.final_design.save(buf, format="PNG")
+        buf.seek(0)
+        st.download_button(
+            label="💾 下载定制效果",
+            data=buf,
+            file_name="custom_tshirt.png",
+            mime="image/png"
+        )
+
         # 返回主界面按钮
         if st.button("返回主界面"):
             st.session_state.page = "welcome"
