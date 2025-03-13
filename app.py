@@ -1,4 +1,9 @@
 import streamlit as st
+import warnings
+warnings.filterwarnings('ignore')
+st.set_option('deprecation.showPyplotGlobalUse', False)
+st.set_option('deprecation.showfileUploaderEncoding', False)
+
 from PIL import Image, ImageDraw
 import requests
 from io import BytesIO
@@ -449,10 +454,10 @@ def show_welcome_page():
 def show_ai_design_page():
     st.title("👕 AI定制服装实验平台")
     st.markdown("### AI定制组 - 创建您独特的T恤设计")
-
+    
     # 创建两列布局
     col1, col2 = st.columns([3, 2])
-
+    
     with col1:
         st.markdown("## 设计区域")
         
@@ -527,7 +532,7 @@ def show_ai_design_page():
                         
                         # 将生成图案缩放到选择区域大小
                         scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
-                            
+                        
                         try:
                             # 确保使用透明通道进行粘贴
                             composite_image.paste(scaled_design, (left, top), scaled_design)
@@ -539,13 +544,15 @@ def show_ai_design_page():
                         st.rerun()
                     else:
                         st.error("生成图像失败，请稍后重试。")
-
-        # 显示最终效果
-        if st.session_state.final_design is not None:
-            st.markdown("### 最终效果")
-            st.image(st.session_state.final_design, use_container_width=True)
-
-            # 提供下载选项
+    
+    # 显示最终效果 - 移出col2，放在整体页面底部
+    if st.session_state.final_design is not None:
+        st.markdown("### 最终效果")
+        st.image(st.session_state.final_design, use_container_width=True)  # 使用新参数
+        
+        # 提供下载选项
+        col1, col2 = st.columns(2)
+        with col1:
             buf = BytesIO()
             st.session_state.final_design.save(buf, format="PNG")
             buf.seek(0)
@@ -555,16 +562,17 @@ def show_ai_design_page():
                 file_name="custom_tshirt.png",
                 mime="image/png"
             )
-
+        
+        with col2:
             # 确认完成按钮
             if st.button("确认完成"):
                 st.session_state.page = "survey"
                 st.rerun()
-
-        # 返回主界面按钮
-        if st.button("返回主界面"):
-            st.session_state.page = "welcome"
-            st.rerun()
+    
+    # 返回主界面按钮 - 单独一行，与AI定制页面一致
+    if st.button("返回主界面"):
+        st.session_state.page = "welcome"
+        st.rerun()
 
 # 预设设计组设计页面
 def show_preset_design_page():
@@ -645,7 +653,7 @@ def show_preset_design_page():
                         # 加载设计图片
                         design_path = os.path.join(predesign_folder, selected_file)
                         preset_design = Image.open(design_path).convert("RGBA")
-                        st.image(preset_design, caption=f"预设设计: {selected_file}", use_container_width=True)
+                        st.image(preset_design, caption=f"预设设计: {selected_file}", use_container_width=True)  # 使用新参数
                         
                         # 应用设计按钮
                         if st.button("应用到T恤上"):
@@ -673,33 +681,34 @@ def show_preset_design_page():
                     except Exception as e:
                         st.error(f"处理预设设计时出错: {e}")
     
-    # 显示最终效果
+    # 显示最终效果 - 与AI定制页面保持一致的布局
     if st.session_state.final_design is not None:
         st.markdown("### 最终效果")
-        st.image(st.session_state.final_design, use_container_width=True)
+        st.image(st.session_state.final_design, use_container_width=True)  # 使用新参数
         
         # 提供下载选项
-        buf = BytesIO()
-        st.session_state.final_design.save(buf, format="PNG")
-        buf.seek(0)
-        st.download_button(
-            label="💾 下载定制效果",
-            data=buf,
-            file_name="custom_tshirt.png",
-            mime="image/png"
-        )
+        col1, col2 = st.columns(2)
+        with col1:
+            buf = BytesIO()
+            st.session_state.final_design.save(buf, format="PNG")
+            buf.seek(0)
+            st.download_button(
+                label="💾 下载定制效果",
+                data=buf,
+                file_name="custom_tshirt.png",
+                mime="image/png"
+            )
+            
+        with col2:
+            # 添加确认完成按钮，点击后跳转到问卷页面
+            if st.button("确认完成"):
+                st.session_state.page = "survey"
+                st.rerun()
 
-        # 添加确认完成按钮，点击后跳转到问卷页面
-        if st.button("确认完成"):
-            st.session_state.page = "survey"
-            st.rerun()
-
-    # 返回主界面按钮
-    col1, col2 = st.columns([1, 1])
-    with col2:
-        if st.button("返回主界面"):
-            st.session_state.page = "welcome"
-            st.rerun()
+    # 返回主界面按钮 - 单独一行，与AI定制页面一致
+    if st.button("返回主界面"):
+        st.session_state.page = "welcome"
+        st.rerun()
 
 # 问卷页面
 def show_survey_page():
