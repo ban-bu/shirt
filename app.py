@@ -480,11 +480,13 @@ def show_ai_design_page():
             else:
                 # 生成图案
                 prompt_text = (
-                    f"Create a unique floral design with a transparent background. "
+                    f"Create a decorative pattern with a completely transparent background. "
                     f"Theme: {theme}. "
                     f"Style: {style}. "
                     f"Colors: {colors}. "
-                    f"Details: {details}."
+                    f"Details: {details}. "
+                    f"The pattern must have NO background, ONLY the design elements on transparency. "
+                    f"The output must be PNG with alpha channel transparency."
                 )
                 
                 with st.spinner("🔮 正在生成设计图..."):
