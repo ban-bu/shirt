@@ -455,42 +455,42 @@ def show_ai_design_page():
     st.markdown("### AI Customization Group - Create Your Unique T-shirt Design")
     
     # Create two-column layout
-col1, col2 = st.columns([3, 2])
-
-with col1:
+    col1, col2 = st.columns([3, 2])
+    
+    with col1:
         st.markdown("## Design Area")
     
         # Load T-shirt base image
-    if st.session_state.base_image is None:
-        try:
-            base_image = Image.open("white_shirt.png").convert("RGBA")
-            st.session_state.base_image = base_image
+        if st.session_state.base_image is None:
+            try:
+                base_image = Image.open("white_shirt.png").convert("RGBA")
+                st.session_state.base_image = base_image
                 # Initialize by drawing selection box in the center
-            initial_image, initial_pos = draw_selection_box(base_image)
-            st.session_state.current_image = initial_image
-            st.session_state.current_box_position = initial_pos
-        except Exception as e:
+                initial_image, initial_pos = draw_selection_box(base_image)
+                st.session_state.current_image = initial_image
+                st.session_state.current_box_position = initial_pos
+            except Exception as e:
                 st.error(f"Error loading white T-shirt image: {e}")
-            st.stop()
-    
+                st.stop()
+        
         st.markdown("**👇 Click anywhere on the T-shirt to move the design frame**")
         
         # Display current image and get click coordinates
-    current_image = st.session_state.current_image
-    coordinates = streamlit_image_coordinates(
-        current_image,
-        key="shirt_image"
-    )
-    
+        current_image = st.session_state.current_image
+        coordinates = streamlit_image_coordinates(
+            current_image,
+            key="shirt_image"
+        )
+        
         # Handle selection area logic - simplify to directly move red box
         if coordinates:
             # Update selection box at current mouse position
-        current_point = (coordinates["x"], coordinates["y"])
-        temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
-        st.session_state.current_image = temp_image
-        st.session_state.current_box_position = new_pos
+            current_point = (coordinates["x"], coordinates["y"])
+            temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
+            st.session_state.current_image = temp_image
+            st.session_state.current_box_position = new_pos
             st.rerun()
-    
+
     with col2:
         st.markdown("## Design Parameters")
         
@@ -502,42 +502,42 @@ with col1:
         
         # Generate design button
         if st.button("🎨 Generate AI Design"):
-        if not theme.strip():
+            if not theme.strip():
                 st.warning("Please enter at least a theme or keyword!")
-        else:
+            else:
                 # Generate pattern
-            prompt_text = (
-                        f"Create a decorative pattern with a completely transparent background. "
-                f"Theme: {theme}. "
-                f"Style: {style}. "
-                f"Colors: {colors}. "
-                f"Details: {details}. "
-                        f"The pattern must have NO background, ONLY the design elements on transparency. "
-                        f"The output must be PNG with alpha channel transparency."
-            )
-            
-                with st.spinner("🔮 Generating design..."):
-                custom_design = generate_vector_image(prompt_text)
+                prompt_text = (
+                    f"Create a decorative pattern with a completely transparent background. "
+                    f"Theme: {theme}. "
+                    f"Style: {style}. "
+                    f"Colors: {colors}. "
+                    f"Details: {details}. "
+                    f"The pattern must have NO background, ONLY the design elements on transparency. "
+                    f"The output must be PNG with alpha channel transparency."
+                )
                 
-                if custom_design:
-                    st.session_state.generated_design = custom_design
+                with st.spinner("🔮 Generating design..."):
+                    custom_design = generate_vector_image(prompt_text)
                     
-                            # Composite on the original image
-                    composite_image = st.session_state.base_image.copy()
-                    
-                            # Place design at current selection position
-                            left, top = st.session_state.current_box_position
-                            box_size = int(1024 * 0.25)
-                            
-                            # Scale generated pattern to selection area size
-                            scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
-                            
-                            try:
-                                # Ensure transparency channel is used for pasting
-                                composite_image.paste(scaled_design, (left, top), scaled_design)
-                            except Exception as e:
-                                st.warning(f"Transparent channel paste failed, direct paste: {e}")
-                                composite_image.paste(scaled_design, (left, top))
+                    if custom_design:
+                        st.session_state.generated_design = custom_design
+                        
+                        # Composite on the original image
+                        composite_image = st.session_state.base_image.copy()
+                        
+                        # Place design at current selection position
+                        left, top = st.session_state.current_box_position
+                        box_size = int(1024 * 0.25)
+                        
+                        # Scale generated pattern to selection area size
+                        scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
+                        
+                        try:
+                            # Ensure transparency channel is used for pasting
+                            composite_image.paste(scaled_design, (left, top), scaled_design)
+                        except Exception as e:
+                            st.warning(f"Transparent channel paste failed, direct paste: {e}")
+                            composite_image.paste(scaled_design, (left, top))
                         
                         st.session_state.final_design = composite_image
                         st.rerun()
@@ -547,7 +547,7 @@ with col1:
     # Display final effect - move out of col2, place at bottom of overall page
     if st.session_state.final_design is not None:
         st.markdown("### Final Result")
-        st.image(st.session_state.final_design, use_container_width=True)  # Use new parameter
+        st.image(st.session_state.final_design, use_container_width=True)
         
         # Provide download option
         col1, col2 = st.columns(2)
@@ -695,16 +695,16 @@ def show_preset_design_page():
         # Provide download option
         col1, col2 = st.columns(2)
         with col1:
-        buf = BytesIO()
-        st.session_state.final_design.save(buf, format="PNG")
-        buf.seek(0)
-        st.download_button(
+            buf = BytesIO()
+            st.session_state.final_design.save(buf, format="PNG")
+            buf.seek(0)
+            st.download_button(
                 label="💾 Download Custom Design",
-            data=buf,
-            file_name="custom_tshirt.png",
-            mime="image/png"
-        )
-
+                data=buf,
+                file_name="custom_tshirt.png",
+                mime="image/png"
+            )
+        
         with col2:
             # Add confirm completion button that navigates to the survey page
             if st.button("Confirm Completion"):
