@@ -556,6 +556,11 @@ def show_ai_design_page():
                 file_name="custom_tshirt.png",
                 mime="image/png"
             )
+            
+            # 确认完成按钮
+            if st.button("确认完成"):
+                st.session_state.page = "survey"
+                st.rerun()
         
         # 返回主界面按钮
         if st.button("返回主界面"):
@@ -680,6 +685,11 @@ def show_preset_design_page():
             file_name="custom_tshirt.png",
             mime="image/png"
         )
+        
+        # 确认完成按钮
+        if st.button("确认完成"):
+            st.session_state.page = "survey"
+            st.rerun()
 
         # 返回主界面按钮
         if st.button("返回主界面"):
