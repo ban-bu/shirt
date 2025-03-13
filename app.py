@@ -681,9 +681,10 @@ def show_preset_design_page():
                             except Exception as e:
                                 st.warning(f"Transparent channel paste failed, direct paste: {e}")
                                 composite_image.paste(scaled_design, (left, top))
-                    
-                    st.session_state.final_design = composite_image
-                    st.rerun()
+                            
+                            # 这两行应该在内部try-except块之后
+                            st.session_state.final_design = composite_image
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Error processing preset design: {e}")
     
