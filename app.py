@@ -645,7 +645,7 @@ def show_preset_design_page():
             else:
                 # 移动选择框
                 current_point = (coordinates["x"], coordinates["y"])
-                # 获取当前T恤图像（可能已经应用了颜色）
+                # 获取当前T恤图像
                 base_img = st.session_state.base_image.copy()
                 temp_image, new_pos = draw_selection_box(base_img, current_point)
                 st.session_state.current_image = temp_image
@@ -655,10 +655,12 @@ def show_preset_design_page():
     with col2:
         st.markdown("## 自定义选项")
         
-        # 添加颜色选择器
-        st.markdown("### 选择T恤颜色")
+        # 绘画模式选项
+        st.markdown("### 直接绘画选项")
+        drawing_mode = st.checkbox("启用绘画模式", value=False)
+        st.session_state.drawing_mode = drawing_mode
+        
         color_options = {
-            "白色": (255, 255, 255),
             "黑色": (0, 0, 0),
             "红色": (255, 0, 0),
             "蓝色": (0, 0, 255),
@@ -668,62 +670,12 @@ def show_preset_design_page():
             "紫色": (128, 0, 128)
         }
         
-        selected_color_name = st.selectbox(
-            "T恤颜色",
-            options=list(color_options.keys()),
-            index=0
-        )
-        
-        selected_color = color_options[selected_color_name]
-        
-        # 显示颜色预览
-        col_preview1, col_preview2 = st.columns([1, 4])
-        with col_preview1:
-            preview_color = Image.new("RGB", (50, 50), selected_color)
-            st.image(preview_color, caption="颜色预览")
-        
-        # 应用颜色按钮
-        if st.button("应用颜色"):
-            # 创建颜色滤镜
-            original_image = st.session_state.original_base_image.copy()
-            colored_image = original_image.copy()
-            
-            # 对非透明像素应用颜色滤镜
-            data = np.array(colored_image)
-            # 获取非完全透明的像素
-            mask = data[:, :, 3] > 0
-            
-            # 创建颜色混合因子（保持一些原始细节）
-            blend_factor = 0.8
-            
-            # 对RGB通道应用颜色
-            for i in range(3):
-                data[:, :, i][mask] = (
-                    data[:, :, i][mask] * (1 - blend_factor) + 
-                    selected_color[i] * blend_factor
-                )
-            
-            # 转回图像
-            colored_image = Image.fromarray(data)
-            st.session_state.base_image = colored_image
-            
-            # 使用新的彩色T恤更新当前图像
-            current_point = st.session_state.current_box_position
-            temp_image, _ = draw_selection_box(colored_image, current_point)
-            st.session_state.current_image = temp_image
-            st.rerun()
-        
-        # 绘画模式选项
-        st.markdown("### 直接绘画选项")
-        drawing_mode = st.checkbox("启用绘画模式", value=False)
-        st.session_state.drawing_mode = drawing_mode
-        
         if drawing_mode:
             # 绘画设置
             draw_color_name = st.selectbox(
                 "绘画颜色",
                 options=list(color_options.keys()),
-                index=1  # 默认黑色
+                index=0  # 默认黑色
             )
             st.session_state.draw_color = color_options[draw_color_name] + (255,)  # 添加alpha通道
             
@@ -794,9 +746,9 @@ def show_preset_design_page():
                                 except Exception as e:
                                     st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
                                     composite_image.paste(scaled_design, (left, top))
-                        
-                            st.session_state.final_design = composite_image
-                            st.rerun()
+                            
+                                st.session_state.final_design = composite_image
+                                st.rerun()
                         except Exception as e:
                             st.error(f"处理预制设计时出错: {e}")
     
