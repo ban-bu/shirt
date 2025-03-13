@@ -522,22 +522,22 @@ def show_ai_design_page():
                     if custom_design:
                         st.session_state.generated_design = custom_design
                         
-                            # Composite on the original image
+                        # Composite on the original image
                         composite_image = st.session_state.base_image.copy()
                         
-                            # Place design at current selection position
-                            left, top = st.session_state.current_box_position
-                            box_size = int(1024 * 0.25)
-                            
-                            # Scale generated pattern to selection area size
-                            scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
-                            
-                            try:
-                                # Ensure transparency channel is used for pasting
-                                composite_image.paste(scaled_design, (left, top), scaled_design)
-                            except Exception as e:
-                                st.warning(f"Transparent channel paste failed, direct paste: {e}")
-                                composite_image.paste(scaled_design, (left, top))
+                        # Place design at current selection position
+                        left, top = st.session_state.current_box_position
+                        box_size = int(1024 * 0.25)
+                        
+                        # Scale generated pattern to selection area size
+                        scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
+                        
+                        try:
+                            # Ensure transparency channel is used for pasting
+                            composite_image.paste(scaled_design, (left, top), scaled_design)
+                        except Exception as e:
+                            st.warning(f"Transparent channel paste failed, direct paste: {e}")
+                            composite_image.paste(scaled_design, (left, top))
                         
                         st.session_state.final_design = composite_image
                         st.rerun()
