@@ -374,6 +374,54 @@ def show_welcome_page():
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # 管理员区域 - 实验数据分析（通过密码保护）
+    st.markdown("---")
+    with st.expander("实验数据分析（仅管理员）"):
+        admin_password = st.text_input("管理员密码", type="password")
+        if admin_password == "admin123":  # 简单密码示例，实际应用中应使用更安全的认证方式
+            try:
+                # 读取实验数据
+                experiment_df = pd.read_csv(DATA_FILE)
+                
+                if not experiment_df.empty:
+                    st.markdown("### 实验数据统计")
+                    
+                    # 基本统计信息
+                    st.markdown("#### 参与人数统计")
+                    group_counts = experiment_df['experiment_group'].value_counts()
+                    st.write(f"总参与人数: {len(experiment_df)}")
+                    st.write(f"AI定制组: {group_counts.get('AI定制组', 0)}人")
+                    st.write(f"预设设计组: {group_counts.get('预设设计组', 0)}人")
+                    
+                    # 购买意向对比
+                    st.markdown("#### 购买意向对比")
+                    purchase_by_group = experiment_df.groupby('experiment_group')['purchase_intent'].mean()
+                    st.bar_chart(purchase_by_group)
+                    
+                    # 满意度对比
+                    st.markdown("#### 满意度对比")
+                    satisfaction_by_group = experiment_df.groupby('experiment_group')['satisfaction_score'].mean()
+                    st.bar_chart(satisfaction_by_group)
+                    
+                    # 愿意支付价格对比
+                    st.markdown("#### 愿意支付价格对比")
+                    price_by_group = experiment_df.groupby('experiment_group')['price_willing_to_pay'].mean()
+                    st.bar_chart(price_by_group)
+                    
+                    # 导出数据按钮
+                    st.download_button(
+                        label="导出完整数据 (CSV)",
+                        data=experiment_df.to_csv(index=False).encode('utf-8'),
+                        file_name="experiment_data_export.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("暂无实验数据，请等待用户参与实验。")
+            except Exception as e:
+                st.error(f"加载或分析数据时出错: {e}")
+        elif admin_password:
+            st.error("密码错误，无法访问管理员区域。")
+
 # AI定制组设计页面
 def show_ai_design_page():
     st.title("👕 AI定制服装实验平台")
@@ -768,73 +816,6 @@ def show_survey_page():
             st.session_state.page = "welcome"
             st.rerun()
 
-# 管理员区域 - 实验数据分析（通过密码保护）
-def show_admin_panel():
-    st.markdown("---")
-    with st.expander("实验数据分析（仅管理员）"):
-        admin_password = st.text_input("管理员密码", type="password")
-        if admin_password == "admin123":  # 简单密码示例，实际应用中应使用更安全的认证方式
-            try:
-                # 读取实验数据
-                experiment_df = pd.read_csv(DATA_FILE)
-                
-                if not experiment_df.empty:
-                    st.markdown("### 实验数据统计")
-                    
-                    # 基本统计信息
-                    st.markdown("#### 参与人数统计")
-                    group_counts = experiment_df['experiment_group'].value_counts()
-                    st.write(f"总参与人数: {len(experiment_df)}")
-                    st.write(f"AI定制组: {group_counts.get('AI定制组', 0)}人")
-                    st.write(f"预设设计组: {group_counts.get('预设设计组', 0)}人")
-                    
-                    # 购买意向对比
-                    st.markdown("#### 购买意向对比")
-                    purchase_by_group = experiment_df.groupby('experiment_group')['purchase_intent'].mean()
-                    st.bar_chart(purchase_by_group)
-                    
-                    # 满意度对比
-                    st.markdown("#### 满意度对比")
-                    satisfaction_by_group = experiment_df.groupby('experiment_group')['satisfaction_score'].mean()
-                    st.bar_chart(satisfaction_by_group)
-                    
-                    # 愿意支付价格对比
-                    st.markdown("#### 愿意支付价格对比")
-                    price_by_group = experiment_df.groupby('experiment_group')['price_willing_to_pay'].mean()
-                    st.bar_chart(price_by_group)
-                    
-                    # 额外分析：AI态度与购买意向的关系
-                    st.markdown("#### AI态度与购买意向关系")
-                    if 'ai_attitude' in experiment_df.columns:
-                        attitude_groups = pd.cut(experiment_df['ai_attitude'], bins=[0, 3, 7, 10], 
-                                               labels=['消极', '中立', '积极'])
-                        attitude_purchase = experiment_df.groupby([attitude_groups, 'experiment_group'])['purchase_intent'].mean().unstack()
-                        st.write(attitude_purchase)
-                        st.bar_chart(attitude_purchase)
-                    
-                    # 年龄分布分析
-                    st.markdown("#### 年龄分布与购买意向")
-                    if 'age' in experiment_df.columns:
-                        age_groups = pd.cut(experiment_df['age'], bins=[18, 25, 35, 50, 80], 
-                                          labels=['18-25岁', '26-35岁', '36-50岁', '51岁以上'])
-                        age_purchase = experiment_df.groupby([age_groups, 'experiment_group'])['purchase_intent'].mean().unstack()
-                        st.write(age_purchase)
-                        st.bar_chart(age_purchase)
-                    
-                    # 导出数据按钮
-                    st.download_button(
-                        label="导出完整数据 (CSV)",
-                        data=experiment_df.to_csv(index=False).encode('utf-8'),
-                        file_name="experiment_data_export.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info("暂无实验数据，请等待用户参与实验。")
-            except Exception as e:
-                st.error(f"加载或分析数据时出错: {e}")
-        elif admin_password:
-            st.error("密码错误，无法访问管理员区域。")
-
 # 主程序控制逻辑
 def main():
     # 初始化数据文件
@@ -855,29 +836,6 @@ def main():
                 st.rerun()
     elif st.session_state.page == "survey":
         show_survey_page()
-    
-    # 始终显示管理员面板（在页面底部）
-    show_admin_panel()
-    
-    # 页脚说明
-    st.markdown("---")
-    st.markdown("### 实验说明")
-    st.markdown("""
-    本实验旨在研究AI定制服装对消费者购买行为的影响。
-    
-    **实验流程**：
-    1. 填写基本信息并选择实验组别
-    2. 按照界面提示完成T恤定制
-    3. 完成满意度和购买意向调查
-    
-    **实验目的**：
-    - 了解AI定制功能如何影响消费者的购买决策
-    - 探索服装定制体验与消费者满意度的关系
-    - 分析不同定制方式与消费者愿意支付价格的关联
-    
-    参与本实验的所有数据仅用于学术研究，我们将对您的信息严格保密。
-    感谢您的参与！
-    """)
 
 # 运行应用
 if __name__ == "__main__":
