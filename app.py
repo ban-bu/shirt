@@ -29,6 +29,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# 在文件开头添加取消警告的设置
+st.set_option('deprecation.showfileUploaderEncoding', False)
+
 # 自定义CSS样式
 st.markdown("""
 <style>
@@ -543,7 +546,7 @@ def show_ai_design_page():
         # 显示最终效果
         if st.session_state.final_design is not None:
             st.markdown("### 最终效果")
-            st.image(st.session_state.final_design, use_column_width=True)
+            st.image(st.session_state.final_design, use_container_width=True)
 
             # 提供下载选项
             buf = BytesIO()
@@ -645,7 +648,7 @@ def show_preset_design_page():
                         # 加载设计图片
                         design_path = os.path.join(predesign_folder, selected_file)
                         preset_design = Image.open(design_path).convert("RGBA")
-                        st.image(preset_design, caption=f"预设设计: {selected_file}", use_column_width=True)
+                        st.image(preset_design, caption=f"预设设计: {selected_file}", use_container_width=True)
                         
                         # 应用设计按钮
                         if st.button("应用到T恤上"):
@@ -676,7 +679,7 @@ def show_preset_design_page():
     # 显示最终效果
     if st.session_state.final_design is not None:
         st.markdown("### 最终效果")
-        st.image(st.session_state.final_design, use_column_width=True)
+        st.image(st.session_state.final_design, use_container_width=True)
         
         # 提供下载选项
         buf = BytesIO()
