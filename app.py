@@ -683,7 +683,12 @@ def show_preset_design_page():
             
             # 显示绘画画布
             st.markdown("### 绘画区域")
-            st.markdown("**👇 在下方区域内绘画您的设计**")
+            st.markdown("**👇 在下方区域内点击并拖动鼠标进行绘画**")
+            
+            # 设置画布背景色
+            canvas_bg = Image.new('RGBA', (400, 400), (240, 240, 240, 255))
+            if 'drawn_canvas' not in st.session_state or st.session_state.drawn_canvas is None:
+                st.session_state.drawn_canvas = canvas_bg.copy()
             
             # 显示当前画布
             canvas_coordinates = streamlit_image_coordinates(
@@ -694,11 +699,10 @@ def show_preset_design_page():
             # 处理绘画逻辑
             if canvas_coordinates:
                 # 在画布上绘画
-                if 'drawn_points' not in st.session_state:
-                    st.session_state.drawn_points = []
+                if 'last_point' not in st.session_state:
+                    st.session_state.last_point = None
                 
-                # 添加当前点到绘画点列表
-                st.session_state.drawn_points.append((canvas_coordinates["x"], canvas_coordinates["y"]))
+                current_point = (canvas_coordinates["x"], canvas_coordinates["y"])
                 
                 # 在画布上绘制
                 draw_canvas = st.session_state.drawn_canvas.copy()
@@ -708,66 +712,109 @@ def show_preset_design_page():
                 draw_color = st.session_state.get('draw_color', (0, 0, 0, 255))
                 brush_size = st.session_state.get('brush_size', 5)
                 
-                # 绘制所有点
-                for point in st.session_state.drawn_points:
-                    draw.ellipse(
-                        [(point[0]-brush_size, point[1]-brush_size), 
-                         (point[0]+brush_size, point[1]+brush_size)], 
-                        fill=draw_color
-                    )
+                # 绘制当前点
+                draw.ellipse(
+                    [(current_point[0]-brush_size, current_point[1]-brush_size), 
+                     (current_point[0]+brush_size, current_point[1]+brush_size)], 
+                    fill=draw_color
+                )
                 
-                # 绘制连接线段（如果有多个点）
-                if len(st.session_state.drawn_points) > 1:
-                    # 连接相邻的点绘制线条
-                    for i in range(len(st.session_state.drawn_points) - 1):
-                        p1 = st.session_state.drawn_points[i]
-                        p2 = st.session_state.drawn_points[i + 1]
-                        
-                        # 如果两点之间距离不太远，则连接线段
-                        distance = ((p2[0]-p1[0])**2 + (p2[1]-p1[1])**2)**0.5
-                        if distance < 50:  # 可根据需要调整
-                            draw.line([p1, p2], fill=draw_color, width=brush_size*2)
+                # 如果有上一个点，则连接线段
+                if st.session_state.last_point is not None:
+                    # 绘制从上一个点到当前点的线段
+                    draw.line([st.session_state.last_point, current_point], 
+                             fill=draw_color, width=brush_size*2)
+                    
+                    # 为了使线条更平滑，在两点之间插入多个点
+                    p1_x, p1_y = st.session_state.last_point
+                    p2_x, p2_y = current_point
+                    distance = ((p2_x-p1_x)**2 + (p2_y-p1_y)**2)**0.5
+                    
+                    # 只有当点之间的距离足够大时才插入点
+                    if distance > brush_size * 2:
+                        steps = int(distance / (brush_size/2)) # 根据距离确定插入的点数
+                        for i in range(1, steps):
+                            # 在两点之间线性插值
+                            ratio = i / steps
+                            mid_x = int(p1_x + (p2_x - p1_x) * ratio)
+                            mid_y = int(p1_y + (p2_y - p1_y) * ratio)
+                            
+                            # 绘制插值点
+                            draw.ellipse(
+                                [(mid_x-brush_size, mid_y-brush_size), 
+                                 (mid_x+brush_size, mid_y+brush_size)], 
+                                fill=draw_color
+                            )
                 
+                # 更新上一个点
+                st.session_state.last_point = current_point
+                
+                # 更新画布
                 st.session_state.drawn_canvas = draw_canvas
                 st.rerun()
             
             # 清除绘画按钮
-            if st.button("清除绘画"):
-                if 'drawn_points' in st.session_state:
-                    st.session_state.drawn_points = []
-                # 重置画布
-                st.session_state.drawn_canvas = st.session_state.canvas.copy()
-                st.rerun()
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("清除绘画"):
+                    st.session_state.last_point = None
+                    # 重置画布
+                    st.session_state.drawn_canvas = canvas_bg.copy()
+                    st.rerun()
+            
+            with col2:
+                if st.button("结束绘画"):
+                    # 重置上一个点，以便下次开始新的线条
+                    st.session_state.last_point = None
+                    st.rerun()
             
             # 应用绘图按钮
             if st.button("应用绘图到T恤"):
-                # 将绘制的图案应用到T恤上
-                if 'drawn_points' in st.session_state and len(st.session_state.drawn_points) > 0:
-                    # 创建透明背景的图案
-                    pattern = st.session_state.drawn_canvas.copy()
-                    
-                    # 将绘制的图案设置为"设计"
-                    st.session_state.generated_design = pattern
-                    
-                    # 合成到原始图像
-                    composite_image = st.session_state.base_image.copy()
-                    
-                    # 在当前选择位置放置设计
-                    left, top = st.session_state.current_box_position
-                    box_size = int(1024 * 0.25)
-                    
-                    # 将绘制的图案缩放到选择区域大小
-                    scaled_design = pattern.resize((box_size, box_size), Image.LANCZOS)
-                    
+                # 确保在应用之前有绘制内容
+                if st.session_state.drawn_canvas is not None:
                     try:
-                        # 确保透明通道用于粘贴
-                        composite_image.paste(scaled_design, (left, top), scaled_design)
+                        # 创建透明背景的图案
+                        # 首先创建一个完全透明的图像
+                        transparent_pattern = Image.new('RGBA', st.session_state.drawn_canvas.size, (0, 0, 0, 0))
+                        
+                        # 将已绘制的内容叠加到透明图像上
+                        # 使非背景像素不透明
+                        data = np.array(st.session_state.drawn_canvas)
+                        bg_color = np.array([240, 240, 240, 255])  # 画布背景色
+                        
+                        # 创建掩码，标识非背景像素
+                        mask = np.sqrt(np.sum((data[:,:,:3] - bg_color[:3])**2, axis=2)) > 20  # 使用欧几里得距离检测非背景像素
+                        
+                        # 创建新的透明图像数据
+                        transparent_data = np.zeros_like(data)
+                        transparent_data[mask] = data[mask]  # 只复制非背景像素
+                        
+                        # 转回图像
+                        pattern = Image.fromarray(transparent_data)
+                        
+                        # 显示调试信息
+                        st.write(f"图案大小: {pattern.size}, 模式: {pattern.mode}")
+                        
+                        # 合成到原始图像
+                        composite_image = st.session_state.base_image.copy()
+                        
+                        # 在当前选择位置放置设计
+                        left, top = st.session_state.current_box_position
+                        box_size = int(1024 * 0.25)
+                        
+                        # 将绘制的图案缩放到选择区域大小
+                        scaled_design = pattern.resize((box_size, box_size), Image.LANCZOS)
+                        
+                        try:
+                            # 确保透明通道用于粘贴
+                            composite_image.paste(scaled_design, (left, top), scaled_design)
+                            st.session_state.final_design = composite_image
+                            st.success("成功应用绘图到T恤")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"粘贴时出错: {e}")
                     except Exception as e:
-                        st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
-                        composite_image.paste(scaled_design, (left, top))
-                    
-                    st.session_state.final_design = composite_image
-                    st.rerun()
+                        st.error(f"处理绘图时出错: {e}")
                 else:
                     st.warning("请先在画布上绘制图案")
                     
@@ -841,26 +888,28 @@ def show_preset_design_page():
     
     # 返回主界面按钮
     if st.button("返回主页"):
-        # 清除所有设计相关状态
-        st.session_state.base_image = None
-        st.session_state.current_image = None
-        st.session_state.current_box_position = None
-        st.session_state.generated_design = None
-        st.session_state.final_design = None
-        st.session_state.selected_preset = None  # 清除选定的预制设计
+        # 仅清除与绘画相关的状态，保留T恤基础图像
         if 'drawing_mode' in st.session_state:
             del st.session_state.drawing_mode
-        if 'drawn_points' in st.session_state:
-            del st.session_state.drawn_points
-        if 'original_base_image' in st.session_state:
-            del st.session_state.original_base_image
-        if 'canvas' in st.session_state:
-            del st.session_state.canvas
+        if 'last_point' in st.session_state:
+            del st.session_state.last_point
         if 'drawn_canvas' in st.session_state:
             del st.session_state.drawn_canvas
-        # 只改变页面状态，保留用户信息和实验组
+        
+        # 重置到主页
         st.session_state.page = "welcome"
         st.rerun()
+
+    # 在应用绘图之后添加这些代码，用于确认绘图状态
+    if 'final_design' in st.session_state:
+        st.write("已生成最终设计")
+        st.write(f"图像尺寸: {st.session_state.final_design.size}")
+    else:
+        st.write("未生成最终设计")
+
+    # 在画布显示后添加此代码，确认画布状态
+    if 'drawn_canvas' in st.session_state:
+        st.write(f"画布尺寸: {st.session_state.drawn_canvas.size}")
 
 # Survey page
 def show_survey_page():
