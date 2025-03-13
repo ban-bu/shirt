@@ -259,23 +259,13 @@ def match_background_to_shirt(design_image, shirt_image):
     design_image.putdata(newData)
     return design_image
 
-# 更新预设设计选项
+# 预设设计选项（使用本地图片）
 PRESET_DESIGNS = {
-    "花卉图案": [
-        "https://example.com/floral1.png",
-        "https://example.com/floral2.png",
-        "https://example.com/floral3.png"
-    ],
-    "几何图案": [
-        "https://example.com/geo1.png",
-        "https://example.com/geo2.png",
-        "https://example.com/geo3.png"
-    ],
-    "抽象艺术": [
-        "https://example.com/abstract1.png",
-        "https://example.com/abstract2.png",
-        "https://example.com/abstract3.png"
-    ]
+    "花卉图案": "preset_designs/floral.png",
+    "几何图案": "preset_designs/geometric.png",
+    "抽象艺术": "preset_designs/abstract.png",
+    "简约线条": "preset_designs/minimalist.png",
+    "动物图案": "preset_designs/animal.png"
 }
 
 # 初始化会话状态
@@ -406,6 +396,7 @@ def show_welcome_page():
             }
             st.session_state.page = "design"
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # 管理员区域 - 实验数据分析（通过密码保护）
     st.markdown("---")
@@ -581,15 +572,18 @@ def show_preset_design_page():
     st.title("👕 预设设计服装实验平台")
     st.markdown("### 预设设计组 - 选择您喜欢的T恤设计")
     
+    # 创建两列布局
     col1, col2 = st.columns([3, 2])
     
     with col1:
         st.markdown("## 设计区域")
         
+        # 加载衬衫底图
         if st.session_state.base_image is None:
             try:
                 base_image = Image.open("white_shirt.png").convert("RGBA")
                 st.session_state.base_image = base_image
+                # 初始化时在中心绘制选择框
                 initial_image, initial_pos = draw_selection_box(base_image)
                 st.session_state.current_image = initial_image
                 st.session_state.current_box_position = initial_pos
@@ -599,13 +593,16 @@ def show_preset_design_page():
         
         st.markdown("**👇 点击T恤上的任意位置来移动设计框**")
         
+        # 显示当前图像并获取点击坐标
         current_image = st.session_state.current_image
         coordinates = streamlit_image_coordinates(
             current_image,
             key="shirt_image"
         )
         
+        # 处理选择区域逻辑 - 简化为直接移动红框
         if coordinates:
+            # 更新当前鼠标位置的选择框
             current_point = (coordinates["x"], coordinates["y"])
             temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
             st.session_state.current_image = temp_image
@@ -615,52 +612,68 @@ def show_preset_design_page():
     with col2:
         st.markdown("## 选择预设设计")
         
-        selected_theme = st.selectbox(
-            "选择主题",
-            options=list(PRESET_DESIGNS.keys())
+        # 显示预设设计选项
+        st.markdown("从以下设计中选择一个：")
+        
+        # 创建网格展示预设设计
+        st.markdown('<div class="design-gallery">', unsafe_allow_html=True)
+        
+        # 显示预设设计图片供选择
+        selected_design = st.radio(
+            "设计选项",
+            options=list(PRESET_DESIGNS.keys()),
+            horizontal=True
         )
         
-        if selected_theme:
-            st.session_state.selected_preset = selected_theme
-            design_options = PRESET_DESIGNS[selected_theme]
+        st.session_state.selected_preset = selected_design
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # 显示选中的设计
+        if st.session_state.selected_preset:
+            st.markdown(f"### 已选择: {st.session_state.selected_preset}")
             
-            selected_design = st.radio(
-                "设计选项",
-                options=design_options,
-                format_func=lambda x: f"设计 {design_options.index(x) + 1}"
-            )
-            
-            if selected_design:
-                try:
-                    response = requests.get(selected_design)
-                    if response.status_code == 200:
-                        preset_design = Image.open(BytesIO(response.content)).convert("RGBA")
-                        st.image(preset_design, caption="预设设计", use_column_width=True)
+            try:
+                # 使用本地预设设计图片
+                preset_design_path = f"preset_designs/{st.session_state.selected_preset}.png"
+                # 检查文件是否存在
+                if os.path.exists(preset_design_path):
+                    preset_design = Image.open(preset_design_path).convert("RGBA")
+                    st.image(preset_design, caption="预设设计", use_column_width=True)
+                    
+                    # 应用设计按钮
+                    if st.button("应用到T恤上"):
+                        st.session_state.generated_design = preset_design
                         
-                        if st.button("应用到T恤上"):
-                            st.session_state.generated_design = preset_design
-                            composite_image = st.session_state.base_image.copy()
-                            left, top = st.session_state.current_box_position
-                            box_size = int(1024 * 0.25)
-                            scaled_design = preset_design.resize((box_size, box_size), Image.LANCZOS)
-                            
-                            try:
-                                composite_image.paste(scaled_design, (left, top), scaled_design)
-                            except Exception as e:
-                                st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
-                                composite_image.paste(scaled_design, (left, top))
-                            
-                            st.session_state.final_design = composite_image
-                            st.rerun()
-                    else:
-                        st.error(f"无法加载预设设计图片，错误码：{response.status_code}")
-                except Exception as e:
-                    st.error(f"处理预设设计时出错: {e}")
+                        # 在原图上合成
+                        composite_image = st.session_state.base_image.copy()
+                        
+                        # 将设计图放置到当前选择位置
+                        left, top = st.session_state.current_box_position
+                        box_size = int(1024 * 0.25)
+                        
+                        # 将预设图案缩放到选择区域大小
+                        scaled_design = preset_design.resize((box_size, box_size), Image.LANCZOS)
+                        
+                        try:
+                            # 确保使用透明通道进行粘贴
+                            composite_image.paste(scaled_design, (left, top), scaled_design)
+                        except Exception as e:
+                            st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
+                            composite_image.paste(scaled_design, (left, top))
+                        
+                        st.session_state.final_design = composite_image
+                        st.rerun()
+                else:
+                    st.error(f"找不到预设设计图片: {preset_design_path}")
+            except Exception as e:
+                st.error(f"处理预设设计时出错: {e}")
     
+    # 显示最终效果
     if st.session_state.final_design is not None:
         st.markdown("### 最终效果")
         st.image(st.session_state.final_design, use_column_width=True)
         
+        # 提供下载选项
         buf = BytesIO()
         st.session_state.final_design.save(buf, format="PNG")
         buf.seek(0)
@@ -671,13 +684,15 @@ def show_preset_design_page():
             mime="image/png"
         )
         
+        # 确认完成按钮
         if st.button("确认完成"):
             st.session_state.page = "survey"
             st.rerun()
 
-    if st.button("返回主界面"):
-        st.session_state.page = "welcome"
-        st.rerun()
+        # 返回主界面按钮
+        if st.button("返回主界面"):
+            st.session_state.page = "welcome"
+            st.rerun()
 
 # 问卷页面
 def show_survey_page():
