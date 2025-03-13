@@ -235,6 +235,30 @@ def get_selection_coordinates(point=None, image_size=None):
     
     return (x1, y1, box_size, box_size)
 
+def match_background_to_shirt(design_image, shirt_image):
+    """将设计图案的背景颜色调整为与衬衫一致"""
+    # 确保图像是RGBA模式
+    design_image = design_image.convert("RGBA")
+    shirt_image = shirt_image.convert("RGBA")
+    
+    # 获取衬衫的背景颜色（假设是左上角的颜色）
+    shirt_bg_color = shirt_image.getpixel((0, 0))
+    
+    # 获取设计图像数据
+    datas = design_image.getdata()
+    newData = []
+    
+    for item in datas:
+        # 如果是透明像素，保持不变
+        if item[3] == 0:
+            newData.append(item)
+        else:
+            # 将非透明像素的背景颜色调整为衬衫的背景颜色
+            newData.append((shirt_bg_color[0], shirt_bg_color[1], shirt_bg_color[2], item[3]))
+    
+    design_image.putdata(newData)
+    return design_image
+
 # 预设设计选项（用于非AI组）
 PRESET_DESIGNS = {
     "花卉图案": "https://img.freepik.com/free-vector/hand-drawn-floral-design_23-2148852577.jpg",
