@@ -399,7 +399,6 @@ def show_welcome_page():
             }
             st.session_state.page = "design"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # Admin area - Experiment data analysis (password protected)
     st.markdown("---")
@@ -601,48 +600,28 @@ def show_preset_design_page():
                 initial_image, initial_pos = draw_selection_box(base_image)
                 st.session_state.current_image = initial_image
                 st.session_state.current_box_position = initial_pos
+                
+                # 创建一个单独的绘画画布
+                canvas_size = (400, 400)
+                canvas = Image.new('RGBA', canvas_size, (255, 255, 255, 255))
+                st.session_state.canvas = canvas
+                st.session_state.drawn_canvas = canvas.copy()
             except Exception as e:
                 st.error(f"加载白色T恤图像时出错: {e}")
                 st.stop()
         
-        st.markdown("**👇 点击T恤上的任意位置移动设计框或直接绘画**")
-        
-        # 显示当前图像并获取点击坐标
-        current_image = st.session_state.current_image
-        coordinates = streamlit_image_coordinates(
-            current_image,
-            key="shirt_image"
-        )
-        
-        # 处理选择区域逻辑或绘画逻辑
-        if coordinates:
-            # 如果处于绘画模式
-            if 'drawing_mode' in st.session_state and st.session_state.drawing_mode:
-                # 在T恤上绘画
-                if 'drawn_points' not in st.session_state:
-                    st.session_state.drawn_points = []
-                
-                st.session_state.drawn_points.append((coordinates["x"], coordinates["y"]))
-                
-                # 在当前图像上绘制点
-                draw_img = st.session_state.current_image.copy()
-                draw = ImageDraw.Draw(draw_img)
-                
-                # 获取绘画颜色和大小
-                draw_color = st.session_state.get('draw_color', (255, 0, 0, 255))
-                brush_size = st.session_state.get('brush_size', 5)
-                
-                # 绘制所有点
-                for point in st.session_state.drawn_points:
-                    draw.ellipse(
-                        [(point[0]-brush_size, point[1]-brush_size), 
-                         (point[0]+brush_size, point[1]+brush_size)], 
-                        fill=draw_color
-                    )
-                
-                st.session_state.current_image = draw_img
-                st.rerun()
-            else:
+        if 'drawing_mode' not in st.session_state or not st.session_state.drawing_mode:
+            st.markdown("**👇 点击T恤上的任意位置移动设计框**")
+            
+            # 显示当前图像并获取点击坐标
+            current_image = st.session_state.current_image
+            coordinates = streamlit_image_coordinates(
+                current_image,
+                key="shirt_image"
+            )
+            
+            # 处理选择区域逻辑
+            if coordinates:
                 # 移动选择框
                 current_point = (coordinates["x"], coordinates["y"])
                 # 获取当前T恤图像
@@ -651,12 +630,33 @@ def show_preset_design_page():
                 st.session_state.current_image = temp_image
                 st.session_state.current_box_position = new_pos
                 st.rerun()
+        
+        # 如果有最终设计，显示它
+        if 'final_design' in st.session_state and st.session_state.final_design is not None:
+            st.markdown("### 最终效果")
+            st.image(st.session_state.final_design, use_container_width=True)
+            
+            # 提供下载选项
+            buf = BytesIO()
+            st.session_state.final_design.save(buf, format="PNG")
+            buf.seek(0)
+            st.download_button(
+                label="💾 下载自定义设计",
+                data=buf,
+                file_name="custom_tshirt.png",
+                mime="image/png"
+            )
+            
+            # 确认完成按钮，导航到问卷调查页面
+            if st.button("确认完成"):
+                st.session_state.page = "survey"
+                st.rerun()
 
     with col2:
         st.markdown("## 自定义选项")
         
         # 绘画模式选项
-        st.markdown("### 直接绘画选项")
+        st.markdown("### 绘画选项")
         drawing_mode = st.checkbox("启用绘画模式", value=False)
         st.session_state.drawing_mode = drawing_mode
         
@@ -681,14 +681,101 @@ def show_preset_design_page():
             
             st.session_state.brush_size = st.slider("笔刷大小", 1, 20, 5)
             
+            # 显示绘画画布
+            st.markdown("### 绘画区域")
+            st.markdown("**👇 在下方区域内绘画您的设计**")
+            
+            # 显示当前画布
+            canvas_coordinates = streamlit_image_coordinates(
+                st.session_state.drawn_canvas,
+                key="drawing_canvas"
+            )
+            
+            # 处理绘画逻辑
+            if canvas_coordinates:
+                # 在画布上绘画
+                if 'drawn_points' not in st.session_state:
+                    st.session_state.drawn_points = []
+                
+                # 添加当前点到绘画点列表
+                st.session_state.drawn_points.append((canvas_coordinates["x"], canvas_coordinates["y"]))
+                
+                # 在画布上绘制
+                draw_canvas = st.session_state.drawn_canvas.copy()
+                draw = ImageDraw.Draw(draw_canvas)
+                
+                # 获取绘画颜色和大小
+                draw_color = st.session_state.get('draw_color', (0, 0, 0, 255))
+                brush_size = st.session_state.get('brush_size', 5)
+                
+                # 绘制所有点
+                for point in st.session_state.drawn_points:
+                    draw.ellipse(
+                        [(point[0]-brush_size, point[1]-brush_size), 
+                         (point[0]+brush_size, point[1]+brush_size)], 
+                        fill=draw_color
+                    )
+                
+                # 绘制连接线段（如果有多个点）
+                if len(st.session_state.drawn_points) > 1:
+                    # 连接相邻的点绘制线条
+                    for i in range(len(st.session_state.drawn_points) - 1):
+                        p1 = st.session_state.drawn_points[i]
+                        p2 = st.session_state.drawn_points[i + 1]
+                        
+                        # 如果两点之间距离不太远，则连接线段
+                        distance = ((p2[0]-p1[0])**2 + (p2[1]-p1[1])**2)**0.5
+                        if distance < 50:  # 可根据需要调整
+                            draw.line([p1, p2], fill=draw_color, width=brush_size*2)
+                
+                st.session_state.drawn_canvas = draw_canvas
+                st.rerun()
+            
+            # 清除绘画按钮
             if st.button("清除绘画"):
                 if 'drawn_points' in st.session_state:
                     st.session_state.drawn_points = []
-                # 重置当前图像
-                current_point = st.session_state.current_box_position
-                temp_image, _ = draw_selection_box(st.session_state.base_image, current_point)
-                st.session_state.current_image = temp_image
+                # 重置画布
+                st.session_state.drawn_canvas = st.session_state.canvas.copy()
                 st.rerun()
+            
+            # 应用绘图按钮
+            if st.button("应用绘图到T恤"):
+                # 将绘制的图案应用到T恤上
+                if 'drawn_points' in st.session_state and len(st.session_state.drawn_points) > 0:
+                    # 创建透明背景的图案
+                    pattern = st.session_state.drawn_canvas.copy()
+                    
+                    # 将绘制的图案设置为"设计"
+                    st.session_state.generated_design = pattern
+                    
+                    # 合成到原始图像
+                    composite_image = st.session_state.base_image.copy()
+                    
+                    # 在当前选择位置放置设计
+                    left, top = st.session_state.current_box_position
+                    box_size = int(1024 * 0.25)
+                    
+                    # 将绘制的图案缩放到选择区域大小
+                    scaled_design = pattern.resize((box_size, box_size), Image.LANCZOS)
+                    
+                    try:
+                        # 确保透明通道用于粘贴
+                        composite_image.paste(scaled_design, (left, top), scaled_design)
+                    except Exception as e:
+                        st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
+                        composite_image.paste(scaled_design, (left, top))
+                    
+                    st.session_state.final_design = composite_image
+                    st.rerun()
+                else:
+                    st.warning("请先在画布上绘制图案")
+                    
+            # 确认完成按钮
+            if 'final_design' in st.session_state and st.session_state.final_design is not None:
+                if st.button("使用此图案完成定制"):
+                    st.session_state.page = "survey"
+                    st.rerun()
         else:
             # 预制设计选择
             st.markdown("### 选择预制设计")
@@ -752,30 +839,6 @@ def show_preset_design_page():
                         except Exception as e:
                             st.error(f"处理预制设计时出错: {e}")
     
-    # 显示最终效果 - 保持与AI自定义页面一致的布局
-    if st.session_state.final_design is not None:
-        st.markdown("### 最终效果")
-        st.image(st.session_state.final_design, use_container_width=True)
-        
-        # 提供下载选项
-        col1, col2 = st.columns(2)
-        with col1:
-            buf = BytesIO()
-            st.session_state.final_design.save(buf, format="PNG")
-            buf.seek(0)
-            st.download_button(
-                label="💾 下载自定义设计",
-                data=buf,
-                file_name="custom_tshirt.png",
-                mime="image/png"
-            )
-        
-        with col2:
-            # 确认完成按钮，导航到问卷调查页面
-            if st.button("确认完成"):
-                st.session_state.page = "survey"
-                st.rerun()
-    
     # 返回主界面按钮
     if st.button("返回主页"):
         # 清除所有设计相关状态
@@ -791,6 +854,10 @@ def show_preset_design_page():
             del st.session_state.drawn_points
         if 'original_base_image' in st.session_state:
             del st.session_state.original_base_image
+        if 'canvas' in st.session_state:
+            del st.session_state.canvas
+        if 'drawn_canvas' in st.session_state:
+            del st.session_state.drawn_canvas
         # 只改变页面状态，保留用户信息和实验组
         st.session_state.page = "welcome"
         st.rerun()
