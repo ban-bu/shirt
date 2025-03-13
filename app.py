@@ -14,25 +14,25 @@ import uuid
 import datetime
 import json
 
-# 需要先安装: pip install streamlit-image-coordinates
+# Required: pip install streamlit-image-coordinates
 from streamlit_image_coordinates import streamlit_image_coordinates
 
-# ========== Deepbricks 配置信息 ==========
+# ========== Deepbricks Configuration ==========
 from openai import OpenAI
 API_KEY = "sk-lNVAREVHjj386FDCd9McOL7k66DZCUkTp6IbV0u9970qqdlg"
 BASE_URL = "https://api.deepbricks.ai/v1/"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 # ==============================================
 
-# 设置页面配置
+# Set page configuration
 st.set_page_config(
-    page_title="AI定制服装消费者行为实验平台",
+    page_title="AI Customized Clothing Consumer Behavior Experiment Platform",
     page_icon="👕",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 自定义CSS样式
+# Custom CSS styles
 st.markdown("""
 <style>
     .main .block-container {
@@ -107,35 +107,40 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 初始化数据存储
+# Initialize data storage
 DATA_FILE = "experiment_data.csv"
 
 def initialize_experiment_data():
-    """初始化或加载实验数据文件"""
+    """Initialize or load the experiment data file"""
     if not os.path.exists(DATA_FILE):
-        df = pd.DataFrame(columns=[
-            'user_id', 'experiment_group', 'timestamp', 'design_duration', 
-            'age', 'gender', 'shopping_frequency', 'purchase_intent', 
-            'satisfaction_score', 'customize_difficulty',
-            'price_willing_to_pay', 'theme', 'design_choice', 'uniqueness_importance',
-            'ai_attitude', 'feedback'
-        ])
-        df.to_csv(DATA_FILE, index=False)
+        try:
+            df = pd.DataFrame(columns=[
+                'user_id', 'experiment_group', 'timestamp', 'design_duration', 
+                'age', 'gender', 'shopping_frequency', 'purchase_intent', 
+                'satisfaction_score', 'customize_difficulty',
+                'price_willing_to_pay', 'theme', 'design_choice', 'uniqueness_importance',
+                'ai_attitude', 'feedback'
+            ])
+            df.to_csv(DATA_FILE, index=False)
+            return True
+        except Exception as e:
+            st.error(f"Error creating data file: {e}")
+            return False
     return True
 
 def save_experiment_data(data):
-    """保存实验数据到CSV文件"""
+    """Save experiment data to CSV file"""
     try:
         df = pd.read_csv(DATA_FILE)
         df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
         df.to_csv(DATA_FILE, index=False)
         return True
     except Exception as e:
-        st.error(f"保存数据时出错: {e}")
+        st.error(f"Error saving data: {e}")
         return False
 
 def generate_vector_image(prompt):
-    """根据提示词调用API生成图像"""
+    """Generate an image based on the prompt using the API"""
     try:
         resp = client.images.generate(
             model="dall-e-3",
@@ -145,10 +150,10 @@ def generate_vector_image(prompt):
             quality="standard"
         )
     except Exception as e:
-        st.error(f"调用 API 时出错: {e}")
+        st.error(f"Error calling API: {e}")
         return None
 
-    if resp and len(resp.data) > 0 and resp.data[0].url:
+    if resp and hasattr(resp, 'data') and len(resp.data) > 0 and hasattr(resp.data[0], 'url') and resp.data[0].url:
         image_url = resp.data[0].url
         try:
             image_resp = requests.get(image_url)
@@ -159,69 +164,60 @@ def generate_vector_image(prompt):
                         png_data = cairosvg.svg2png(bytestring=image_resp.content)
                         return Image.open(BytesIO(png_data)).convert("RGBA")
                     except Exception as conv_err:
-                        st.error(f"SVG 转 PNG 时出错: {conv_err}")
+                        st.error(f"Error converting SVG to PNG: {conv_err}")
                         return None
                 else:
                     return Image.open(BytesIO(image_resp.content)).convert("RGBA")
             else:
-                st.error(f"下载图像失败，状态码：{image_resp.status_code}")
+                st.error(f"Failed to download image, status code: {image_resp.status_code}")
         except Exception as download_err:
-            st.error(f"请求图像时出错: {download_err}")
+            st.error(f"Error requesting image: {download_err}")
     else:
-        st.error("未能从 API 响应中获取图像 URL。")
+        st.error("Failed to get image URL from API response.")
     return None
 
 def draw_selection_box(image, point=None):
-    """在图像上绘制固定大小的选择框"""
-    # 创建图像副本以避免修改原始图像
+    """Draw a fixed-size selection box on the image"""
     img_copy = image.copy()
     draw = ImageDraw.Draw(img_copy)
     
-    # 固定框的大小 (1024 * 0.25)
     box_size = int(1024 * 0.25)
     
-    # 如果没有指定位置，则放在图片中心
     if point is None:
         x1 = (image.width - box_size) // 2
         y1 = (image.height - box_size) // 2
     else:
         x1, y1 = point
-        # 确保选择框不会超出图片边界
         x1 = max(0, min(x1 - box_size//2, image.width - box_size))
         y1 = max(0, min(y1 - box_size//2, image.height - box_size))
     
     x2, y2 = x1 + box_size, y1 + box_size
     
-    # 绘制红色轮廓
     draw.rectangle(
         [(x1, y1), (x2, y2)],
         outline=(255, 0, 0),
         width=2
     )
     
-    # 创建单独的透明覆盖层用于填充
     overlay = Image.new('RGBA', img_copy.size, (0, 0, 0, 0))
     draw_overlay = ImageDraw.Draw(overlay)
     
-    # 绘制半透明填充
     draw_overlay.rectangle(
         [(x1, y1), (x2, y2)],
         fill=(255, 0, 0, 50)
     )
     
-    # 确保两个图像都是RGBA模式
     if img_copy.mode != 'RGBA':
         img_copy = img_copy.convert('RGBA')
     
-    # 合成图像
     try:
         return Image.alpha_composite(img_copy, overlay), (x1, y1)
     except Exception as e:
-        st.warning(f"图像合成失败: {e}")
+        st.warning(f"Image composition failed: {e}")
         return img_copy, (x1, y1)
 
 def get_selection_coordinates(point=None, image_size=None):
-    """获取固定大小选择框的坐标和尺寸"""
+    """Get coordinates and size of the fixed-size selection box"""
     box_size = int(1024 * 0.25)
     
     if point is None and image_size is not None:
@@ -230,7 +226,6 @@ def get_selection_coordinates(point=None, image_size=None):
         y1 = (height - box_size) // 2
     else:
         x1, y1 = point
-        # 确保选择框不会超出图片边界
         if image_size:
             width, height = image_size
             x1 = max(0, min(x1 - box_size//2, width - box_size))
@@ -239,39 +234,34 @@ def get_selection_coordinates(point=None, image_size=None):
     return (x1, y1, box_size, box_size)
 
 def match_background_to_shirt(design_image, shirt_image):
-    """将设计图案的背景颜色调整为与衬衫一致"""
-    # 确保图像是RGBA模式
+    """Adjust the background color of the design pattern to match the shirt"""
     design_image = design_image.convert("RGBA")
     shirt_image = shirt_image.convert("RGBA")
     
-    # 获取衬衫的背景颜色（假设是左上角的颜色）
     shirt_bg_color = shirt_image.getpixel((0, 0))
     
-    # 获取设计图像数据
     datas = design_image.getdata()
     newData = []
     
     for item in datas:
-        # 如果是透明像素，保持不变
         if item[3] == 0:
             newData.append(item)
         else:
-            # 将非透明像素的背景颜色调整为衬衫的背景颜色
             newData.append((shirt_bg_color[0], shirt_bg_color[1], shirt_bg_color[2], item[3]))
     
     design_image.putdata(newData)
     return design_image
 
-# 预设设计选项（使用本地图片）
+# Preset design options (using local images)
 PRESET_DESIGNS = {
-    "花卉图案": "preset_designs/floral.png",
-    "几何图案": "preset_designs/geometric.png",
-    "抽象艺术": "preset_designs/abstract.png",
-    "简约线条": "preset_designs/minimalist.png",
-    "动物图案": "preset_designs/animal.png"
+    "Floral Pattern": "preset_designs/floral.png",
+    "Geometric Pattern": "preset_designs/geometric.png",
+    "Abstract Art": "preset_designs/abstract.png",
+    "Minimalist Lines": "preset_designs/minimalist.png",
+    "Animal Pattern": "preset_designs/animal.png"
 }
 
-# 初始化会话状态
+# Initialize session state
 if 'page' not in st.session_state:
     st.session_state.page = "welcome"
 if 'user_id' not in st.session_state:
@@ -297,76 +287,76 @@ if 'user_info' not in st.session_state:
 if 'selected_preset' not in st.session_state:
     st.session_state.selected_preset = None
 
-# 确保数据文件存在
+# Ensure data file exists
 initialize_experiment_data()
 
-# 欢迎与信息收集页面
+# Welcome and information collection page
 def show_welcome_page():
-    st.title("👕 AI定制服装消费者行为实验平台")
+    st.title("👕 AI Customized Clothing Consumer Behavior Experiment Platform")
     
     with st.container():
         st.markdown('<div class="welcome-card">', unsafe_allow_html=True)
-        st.markdown("### 欢迎参与我们的实验！")
+        st.markdown("### Welcome to our experiment!")
         st.markdown("""
-        本实验旨在研究不同服装定制方式对消费者购买行为的影响。您将有机会体验T恤定制过程，并分享您的反馈。
+        This experiment aims to study the impact of different clothing customization methods on consumer purchasing behavior. You will have the opportunity to experience the T-shirt customization process and share your feedback.
         
-        **实验流程**：
-        1. 填写基本信息
-        2. 选择实验组别
-        3. 完成T恤定制
-        4. 提交问卷反馈
+        **Experiment Process**:
+        1. Fill in basic information
+        2. Choose an experimental group
+        3. Complete T-shirt customization
+        4. Submit questionnaire feedback
         
-        您的参与对我们的研究至关重要，非常感谢您的支持！
+        Your participation is crucial to our research, thank you for your support!
         """)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown("### 请填写您的基本信息")
+    st.markdown("### Please fill in your basic information")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        age = st.number_input("您的年龄", min_value=18, max_value=80, value=25)
+        age = st.number_input("Your Age", min_value=18, max_value=80, value=25)
         
-        gender = st.radio("您的性别", 
-                          options=["男", "女", "其他", "不愿透露"])
+        gender = st.radio("Your Gender", 
+                          options=["Male", "Female", "Other", "Prefer not to say"])
     
     with col2:
         shopping_frequency = st.selectbox(
-            "您购买服装的频率是？",
-            options=["每周都购买", "每月购买几次", "每季度购买", "每年购买几次", "极少购买"]
+            "How often do you buy clothing?",
+            options=["Every week", "A few times a month", "Once a quarter", "A few times a year", "Rarely"]
         )
         
         customize_experience = st.selectbox(
-            "您之前是否有过服装定制经验？",
-            options=["有很多经验", "有一些经验", "很少有经验", "从未尝试过"]
+            "Do you have any experience with clothing customization?",
+            options=["A lot of experience", "Some experience", "Very little experience", "Never tried"]
         )
     
     ai_attitude = st.slider(
-        "您对人工智能技术的态度如何？",
+        "How do you feel about AI technology?",
         min_value=1, max_value=10, value=5,
-        help="1表示非常消极，10表示非常积极"
+        help="1 means very negative, 10 means very positive"
     )
     
     uniqueness_importance = st.slider(
-        "服装独特性对您的重要程度如何？",
+        "How important is clothing uniqueness to you?",
         min_value=1, max_value=10, value=5,
-        help="1表示完全不重要，10表示非常重要"
+        help="1 means not important at all, 10 means very important"
     )
     
-    st.markdown("### 请选择您要参与的实验组别")
+    st.markdown("### Please choose the experimental group you want to participate in")
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown('<div class="group-card">', unsafe_allow_html=True)
-        st.markdown("#### AI定制组")
+        st.markdown("#### AI Customization Group")
         st.markdown("""
-        - 使用人工智能技术生成定制图案
-        - 根据您的喜好和描述创建独特设计
-        - 在T恤上自由放置设计图案
+        - Use AI technology to generate custom patterns
+        - Create unique designs based on your preferences and descriptions
+        - Freely place design patterns on the T-shirt
         """)
-        if st.button("选择AI定制组"):
-            st.session_state.experiment_group = "AI定制组"
+        if st.button("Choose AI Customization Group"):
+            st.session_state.experiment_group = "AI Customization Group"
             st.session_state.user_info = {
                 'age': age,
                 'gender': gender,
@@ -381,14 +371,14 @@ def show_welcome_page():
     
     with col2:
         st.markdown('<div class="group-card">', unsafe_allow_html=True)
-        st.markdown("#### 预设设计组")
+        st.markdown("#### Preset Design Group")
         st.markdown("""
-        - 从精选的设计库中选择图案
-        - 高质量专业设计
-        - 在T恤上自由放置选定的图案
+        - Choose patterns from a curated design library
+        - High-quality professional designs
+        - Freely place selected patterns on the T-shirt
         """)
-        if st.button("选择预设设计组"):
-            st.session_state.experiment_group = "预设设计组"
+        if st.button("Choose Preset Design Group"):
+            st.session_state.experiment_group = "Preset Design Group"
             st.session_state.user_info = {
                 'age': age,
                 'gender': gender,
@@ -400,221 +390,214 @@ def show_welcome_page():
             st.session_state.page = "design"
             st.rerun()
 
-    # 管理员区域 - 实验数据分析（通过密码保护）
+    # Admin area - Experiment data analysis (password protected)
     st.markdown("---")
-    with st.expander("实验数据分析（仅管理员）"):
-        admin_password = st.text_input("管理员密码", type="password")
-        if admin_password == "admin123":  # 简单密码示例，实际应用中应使用更安全的认证方式
+    with st.expander("Experiment Data Analysis (Admin Only)"):
+        admin_password = st.text_input("Admin Password", type="password")
+        if admin_password == "admin123":  # Simple password example, should use a more secure authentication method in practice
             try:
-                # 读取实验数据
+                # Read experiment data
                 experiment_df = pd.read_csv(DATA_FILE)
                 
                 if not experiment_df.empty:
-                    st.markdown("### 实验数据统计")
+                    st.markdown("### Experiment Data Statistics")
                     
-                    # 基本统计信息
-                    st.markdown("#### 参与人数统计")
+                    # Basic statistics
+                    st.markdown("#### Participant Count")
                     group_counts = experiment_df['experiment_group'].value_counts()
-                    st.write(f"总参与人数: {len(experiment_df)}")
-                    st.write(f"AI定制组: {group_counts.get('AI定制组', 0)}人")
-                    st.write(f"预设设计组: {group_counts.get('预设设计组', 0)}人")
+                    st.write(f"Total Participants: {len(experiment_df)}")
+                    st.write(f"AI Customization Group: {group_counts.get('AI Customization Group', 0)} people")
+                    st.write(f"Preset Design Group: {group_counts.get('Preset Design Group', 0)} people")
                     
-                    # 购买意向对比
-                    st.markdown("#### 购买意向对比")
+                    # Purchase intent comparison
+                    st.markdown("#### Purchase Intent Comparison")
                     purchase_by_group = experiment_df.groupby('experiment_group')['purchase_intent'].mean()
                     st.bar_chart(purchase_by_group)
                     
-                    # 满意度对比
-                    st.markdown("#### 满意度对比")
+                    # Satisfaction comparison
+                    st.markdown("#### Satisfaction Comparison")
                     satisfaction_by_group = experiment_df.groupby('experiment_group')['satisfaction_score'].mean()
                     st.bar_chart(satisfaction_by_group)
                     
-                    # 愿意支付价格对比
-                    st.markdown("#### 愿意支付价格对比")
+                    # Willingness to pay comparison
+                    st.markdown("#### Willingness to Pay Comparison")
                     price_by_group = experiment_df.groupby('experiment_group')['price_willing_to_pay'].mean()
                     st.bar_chart(price_by_group)
                     
-                    # 导出数据按钮
+                    # Export data button
                     st.download_button(
-                        label="导出完整数据 (CSV)",
+                        label="Export Full Data (CSV)",
                         data=experiment_df.to_csv(index=False).encode('utf-8'),
                         file_name="experiment_data_export.csv",
                         mime="text/csv"
                     )
                 else:
-                    st.info("暂无实验数据，请等待用户参与实验。")
+                    st.info("No experiment data available, please wait for user participation.")
             except Exception as e:
-                st.error(f"加载或分析数据时出错: {e}")
+                st.error(f"Error loading or analyzing data: {e}")
         elif admin_password:
-            st.error("密码错误，无法访问管理员区域。")
+            st.error("Incorrect password, unable to access admin area.")
 
-# AI定制组设计页面
+# AI Customization Group Design Page
 def show_ai_design_page():
-    st.title("👕 AI定制服装实验平台")
-    st.markdown("### AI定制组 - 创建您独特的T恤设计")
+    st.title("👕 AI Customized Clothing Experiment Platform")
+    st.markdown("### AI Customization Group - Create Your Unique T-shirt Design")
     
-    # 创建两列布局
-    col1, col2 = st.columns([3, 2])
-    
-    with col1:
-        st.markdown("## 设计区域")
-        
-        # 加载衬衫底图
-        if st.session_state.base_image is None:
-            try:
-                base_image = Image.open("white_shirt.png").convert("RGBA")
-                st.session_state.base_image = base_image
-                # 初始化时在中心绘制选择框
-                initial_image, initial_pos = draw_selection_box(base_image)
-                st.session_state.current_image = initial_image
-                st.session_state.current_box_position = initial_pos
-            except Exception as e:
-                st.error(f"加载白衬衫图片时出错: {e}")
-                st.stop()
-        
-        st.markdown("**👇 点击T恤上的任意位置来移动设计框**")
-        
-        # 显示当前图像并获取点击坐标
-        current_image = st.session_state.current_image
-        coordinates = streamlit_image_coordinates(
-            current_image,
-            key="shirt_image"
-        )
-        
-        # 处理选择区域逻辑 - 简化为直接移动红框
-        if coordinates:
-            # 更新当前鼠标位置的选择框
-            current_point = (coordinates["x"], coordinates["y"])
-            temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
-            st.session_state.current_image = temp_image
-            st.session_state.current_box_position = new_pos
-            st.rerun()
+    # Create two-column layout
+col1, col2 = st.columns([3, 2])
 
+with col1:
+        st.markdown("## Design Area")
+    
+        # Load shirt base image
+    if st.session_state.base_image is None:
+        try:
+            base_image = Image.open("white_shirt.png").convert("RGBA")
+            st.session_state.base_image = base_image
+            initial_image, initial_pos = draw_selection_box(base_image)
+            st.session_state.current_image = initial_image
+            st.session_state.current_box_position = initial_pos
+        except Exception as e:
+                st.error(f"Error loading white shirt image: {e}")
+            st.stop()
+    
+        st.markdown("**👇 Click anywhere on the T-shirt to move the design box**")
+        
+        # Display current image and get click coordinates
+    current_image = st.session_state.current_image
+    coordinates = streamlit_image_coordinates(
+        current_image,
+        key="shirt_image"
+    )
+    
+        # Handle selection area logic - simplified to directly move the red box
+        if coordinates:
+        current_point = (coordinates["x"], coordinates["y"])
+        temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
+        st.session_state.current_image = temp_image
+        st.session_state.current_box_position = new_pos
+            st.rerun()
+    
     with col2:
-        st.markdown("## 设计参数")
+        st.markdown("## Design Parameters")
         
-        # 用户输入个性化参数
-        theme = st.text_input("主题或关键词 (必填)", "花卉图案")
-        style = st.text_input("设计风格", "abstract")
-        colors = st.text_input("偏好颜色", "pink, gold")
-        details = st.text_area("更多细节", "some swirling shapes")
+        # User input for personalization parameters
+        theme = st.text_input("Theme or Keywords (Required)", "Floral Pattern")
+        style = st.text_input("Design Style", "abstract")
+        colors = st.text_input("Preferred Colors", "pink, gold")
+        details = st.text_area("More Details", "some swirling shapes")
         
-        # 生成设计按钮
-        if st.button("🎨 生成AI设计"):
-            if not theme.strip():
-                st.warning("请至少输入主题或关键词！")
-            else:
-                # 生成图案
-                prompt_text = (
+        # Generate design button
+        if st.button("🎨 Generate AI Design"):
+        if not theme.strip():
+                st.warning("Please enter at least a theme or keywords!")
+        else:
+                # Generate pattern
+            prompt_text = (
                     f"Create a decorative pattern with a completely transparent background. "
-                    f"Theme: {theme}. "
-                    f"Style: {style}. "
-                    f"Colors: {colors}. "
-                    f"Details: {details}. "
+                f"Theme: {theme}. "
+                f"Style: {style}. "
+                f"Colors: {colors}. "
+                f"Details: {details}. "
                     f"The pattern must have NO background, ONLY the design elements on transparency. "
                     f"The output must be PNG with alpha channel transparency."
-                )
+            )
+            
+                with st.spinner("🔮 Generating design..."):
+                custom_design = generate_vector_image(prompt_text)
                 
-                with st.spinner("🔮 正在生成设计图..."):
-                    custom_design = generate_vector_image(prompt_text)
+                if custom_design:
+                    st.session_state.generated_design = custom_design
                     
-                    if custom_design:
-                        st.session_state.generated_design = custom_design
-                        
-                        # 在原图上合成
-                        composite_image = st.session_state.base_image.copy()
-                        
-                        # 将设计图放置到当前选择位置
+                        # Composite on the base image
+                    composite_image = st.session_state.base_image.copy()
+                    
                         left, top = st.session_state.current_box_position
                         box_size = int(1024 * 0.25)
                         
-                        # 将生成图案缩放到选择区域大小
                         scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
                         
                         try:
-                            # 确保使用透明通道进行粘贴
                             composite_image.paste(scaled_design, (left, top), scaled_design)
                         except Exception as e:
-                            st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
+                            st.warning(f"Failed to paste using transparency channel, pasting directly: {e}")
                             composite_image.paste(scaled_design, (left, top))
                         
                         st.session_state.final_design = composite_image
                         st.rerun()
                     else:
-                        st.error("生成图像失败，请稍后重试。")
+                        st.error("Failed to generate image, please try again later.")
     
-    # 显示最终效果 - 移出col2，放在整体页面底部
+    # Display final effect - moved to the bottom of the overall page
     if st.session_state.final_design is not None:
-        st.markdown("### 最终效果")
-        st.image(st.session_state.final_design, use_container_width=True)  # 使用新参数
+        st.markdown("### Final Effect")
+        st.image(st.session_state.final_design, use_container_width=True)  # Use new parameter
         
-        # 提供下载选项
+        # Provide download option
         col1, col2 = st.columns(2)
         with col1:
             buf = BytesIO()
             st.session_state.final_design.save(buf, format="PNG")
             buf.seek(0)
             st.download_button(
-                label="💾 下载定制效果",
+                label="💾 Download Custom Effect",
                 data=buf,
                 file_name="custom_tshirt.png",
                 mime="image/png"
             )
         
         with col2:
-            # 确认完成按钮
-            if st.button("确认完成"):
+            # Confirm completion button
+            if st.button("Confirm Completion"):
                 st.session_state.page = "survey"
                 st.rerun()
     
-    # 返回主界面按钮 - 修改此处
-    if st.button("返回主界面"):
-        # 清空所有设计相关状态
+    # Return to main interface button - single line, consistent with AI customization page
+    if st.button("Return to Main Interface"):
+        # Clear all design-related states
         st.session_state.base_image = None
         st.session_state.current_image = None
         st.session_state.current_box_position = None
         st.session_state.generated_design = None
         st.session_state.final_design = None
-        # 只改变页面状态，保留用户信息和实验组别
+        st.session_state.selected_preset = None  # Clear selected preset design
         st.session_state.page = "welcome"
         st.rerun()
 
-# 预设设计组设计页面
+# Preset Design Group Design Page
 def show_preset_design_page():
-    st.title("👕 预设设计服装实验平台")
-    st.markdown("### 预设设计组 - 选择您喜欢的T恤设计")
+    st.title("👕 Preset Design Clothing Experiment Platform")
+    st.markdown("### Preset Design Group - Choose Your Favorite T-shirt Design")
     
-    # 创建两列布局
+    # Create two-column layout
     col1, col2 = st.columns([3, 2])
     
     with col1:
-        st.markdown("## 设计区域")
+        st.markdown("## Design Area")
         
-        # 加载衬衫底图
+        # Load shirt base image
         if st.session_state.base_image is None:
             try:
                 base_image = Image.open("white_shirt.png").convert("RGBA")
                 st.session_state.base_image = base_image
-                # 初始化时在中心绘制选择框
                 initial_image, initial_pos = draw_selection_box(base_image)
                 st.session_state.current_image = initial_image
                 st.session_state.current_box_position = initial_pos
             except Exception as e:
-                st.error(f"加载白衬衫图片时出错: {e}")
+                st.error(f"Error loading white shirt image: {e}")
                 st.stop()
         
-        st.markdown("**👇 点击T恤上的任意位置来移动设计框**")
+        st.markdown("**👇 Click anywhere on the T-shirt to move the design box**")
         
-        # 显示当前图像并获取点击坐标
+        # Display current image and get click coordinates
         current_image = st.session_state.current_image
         coordinates = streamlit_image_coordinates(
             current_image,
             key="shirt_image"
         )
         
-        # 处理选择区域逻辑 - 简化为直接移动红框
+        # Handle selection area logic - simplified to directly move the red box
         if coordinates:
-            # 更新当前鼠标位置的选择框
             current_point = (coordinates["x"], coordinates["y"])
             temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
             st.session_state.current_image = temp_image
@@ -622,202 +605,196 @@ def show_preset_design_page():
             st.rerun()
 
     with col2:
-        st.markdown("## 选择预设设计")
+        st.markdown("## Choose Preset Design")
         
-        # 显示预设设计图片选项
-        st.markdown("从下列设计中选择一个：")
+        # Display preset design image options
+        st.markdown("Choose one from the following designs:")
         
-        # 获取predesign文件夹中的所有图片
         predesign_folder = "predesign"
         design_files = []
         
-        # 确保文件夹存在
+        # 确保文件夹存在或创建默认文件夹
         if not os.path.exists(predesign_folder):
-            st.error(f"找不到预设设计文件夹：{predesign_folder}，请确保该文件夹存在。")
-        else:
-            # 获取所有支持的图片文件
+            try:
+                os.makedirs(predesign_folder)
+                st.warning(f"Created preset design folder: {predesign_folder}. Please add design files to this folder.")
+            except Exception as e:
+                st.error(f"Cannot create preset design folder: {predesign_folder}. Error: {e}")
+        
+        # 更健壮的文件处理
+        if os.path.exists(predesign_folder):
             for file in os.listdir(predesign_folder):
                 if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
                     design_files.append(file)
             
             if not design_files:
-                st.warning(f"未在 {predesign_folder} 文件夹中找到任何图片文件。")
+                st.warning(f"No image files found in {predesign_folder}. Please add design files to this folder.")
             else:
-                # 显示图片选择界面
                 selected_file = st.radio(
-                    "可用设计",
+                    "Available Designs",
                     options=design_files,
                     horizontal=True
                 )
                 
                 st.session_state.selected_preset = selected_file
                 
-                # 显示选中的设计
                 if st.session_state.selected_preset:
                     try:
-                        # 加载设计图片
                         design_path = os.path.join(predesign_folder, selected_file)
-                        preset_design = Image.open(design_path).convert("RGBA")
-                        st.image(preset_design, caption=f"预设设计: {selected_file}", use_container_width=True)  # 使用新参数
-                        
-                        # 应用设计按钮
-                        if st.button("应用到T恤上"):
-                            st.session_state.generated_design = preset_design
+                        if not os.path.exists(design_path):
+                            st.error(f"Selected design file {design_path} not found.")
+                        else:
+                            preset_design = Image.open(design_path).convert("RGBA")
+                            st.image(preset_design, caption=f"Preset Design: {selected_file}", use_container_width=True)
                             
-                            # 在原图上合成
-                            composite_image = st.session_state.base_image.copy()
-                            
-                            # 将设计图放置到当前选择位置
-                            left, top = st.session_state.current_box_position
-                            box_size = int(1024 * 0.25)
-                            
-                            # 将预设图案缩放到选择区域大小
-                            scaled_design = preset_design.resize((box_size, box_size), Image.LANCZOS)
+                            # 应用设计按钮
+                            if st.button("Apply to T-shirt"):
+                                st.session_state.generated_design = preset_design
+                                
+                                # 在原图上合成
+                                composite_image = st.session_state.base_image.copy()
+                                
+                                # 将设计图放置到当前选择位置
+                                left, top = st.session_state.current_box_position
+                                box_size = int(1024 * 0.25)
+                                
+                                # 将预设图案缩放到选择区域大小
+                                scaled_design = preset_design.resize((box_size, box_size), Image.LANCZOS)
                             
                             try:
                                 # 确保使用透明通道进行粘贴
                                 composite_image.paste(scaled_design, (left, top), scaled_design)
                             except Exception as e:
-                                st.warning(f"使用透明通道粘贴失败，直接粘贴: {e}")
+                                    st.warning(f"Failed to paste using transparency channel, pasting directly: {e}")
                                 composite_image.paste(scaled_design, (left, top))
-                            
-                            st.session_state.final_design = composite_image
-                            st.rerun()
+                    
+                    st.session_state.final_design = composite_image
+                    st.rerun()
                     except Exception as e:
-                        st.error(f"处理预设设计时出错: {e}")
-    
-    # 显示最终效果 - 与AI定制页面保持一致的布局
+                        st.error(f"Error processing preset design: {e}")
+
+    # Display final effect - consistent layout with AI customization page
     if st.session_state.final_design is not None:
-        st.markdown("### 最终效果")
-        st.image(st.session_state.final_design, use_container_width=True)  # 使用新参数
+        st.markdown("### Final Effect")
+        st.image(st.session_state.final_design, use_container_width=True)  # Use new parameter
         
-        # 提供下载选项
         col1, col2 = st.columns(2)
         with col1:
-            buf = BytesIO()
-            st.session_state.final_design.save(buf, format="PNG")
-            buf.seek(0)
-            st.download_button(
-                label="💾 下载定制效果",
-                data=buf,
-                file_name="custom_tshirt.png",
-                mime="image/png"
-            )
-            
+        buf = BytesIO()
+        st.session_state.final_design.save(buf, format="PNG")
+        buf.seek(0)
+        st.download_button(
+                label="💾 Download Custom Effect",
+            data=buf,
+            file_name="custom_tshirt.png",
+            mime="image/png"
+        )
+
         with col2:
-            # 添加确认完成按钮，点击后跳转到问卷页面
-            if st.button("确认完成"):
+            if st.button("Confirm Completion"):
                 st.session_state.page = "survey"
                 st.rerun()
 
-    # 返回主界面按钮 - 修改此处
-    if st.button("返回主界面"):
-        # 清空所有设计相关状态
+    # Return to main interface button - single line, consistent with AI customization page
+    if st.button("Return to Main Interface"):
+        # Clear all design-related states
         st.session_state.base_image = None
         st.session_state.current_image = None
         st.session_state.current_box_position = None
         st.session_state.generated_design = None
         st.session_state.final_design = None
-        st.session_state.selected_preset = None  # 清空已选的预设设计
-        # 只改变页面状态，保留用户信息和实验组别
+        st.session_state.selected_preset = None  # Clear selected preset design
         st.session_state.page = "welcome"
         st.rerun()
 
-# 问卷页面
+# Survey Page
 def show_survey_page():
-    st.title("👕 服装定制实验问卷")
-    st.markdown(f"### {st.session_state.experiment_group} - 您的反馈")
+    st.title("👕 Clothing Customization Experiment Questionnaire")
+    st.markdown(f"### {st.session_state.experiment_group} - Your Feedback")
     
     if not st.session_state.submitted:
         st.markdown('<div class="purchase-intent">', unsafe_allow_html=True)
         
-        # 计算设计花费的时间
+        # 确保start_time存在
+        if 'start_time' not in st.session_state:
+            st.session_state.start_time = datetime.datetime.now()
+        
         design_duration = (datetime.datetime.now() - st.session_state.start_time).total_seconds() / 60
         
-        # 购买意向
         purchase_intent = st.slider(
-            "如果这件T恤在市场上销售，您购买此产品的可能性有多大？",
+            "If this T-shirt were sold on the market, how likely are you to purchase this product?",
             min_value=1, max_value=10, value=5,
-            help="1表示绝对不会购买，10表示一定会购买"
+            help="1 means definitely won't buy, 10 means definitely will buy"
         )
         
-        # 满意度评分
         satisfaction_score = st.slider(
-            "您对最终设计效果的满意度？",
+            "How satisfied are you with the final design?",
             min_value=1, max_value=10, value=5,
-            help="1表示非常不满意，10表示非常满意"
+            help="1 means very dissatisfied, 10 means very satisfied"
         )
         
-        # 不同组别的特有问题
-        if st.session_state.experiment_group == "AI定制组":
-            # AI定制组特有问题
+        if st.session_state.experiment_group == "AI Customization Group":
             ai_effectiveness = st.slider(
-                "您认为AI生成的设计有多符合您的期望？",
+                "How well do you think the AI-generated design meets your expectations?",
                 min_value=1, max_value=10, value=5,
-                help="1表示完全不符合期望，10表示完全符合期望"
+                help="1 means does not meet expectations at all, 10 means fully meets expectations"
             )
             
             ai_uniqueness = st.slider(
-                "您认为AI生成的设计有多独特？",
+                "How unique do you think the AI-generated design is?",
                 min_value=1, max_value=10, value=5,
-                help="1表示一点都不独特，10表示非常独特"
+                help="1 means not unique at all, 10 means very unique"
             )
             
             ai_experience = st.radio(
-                "使用AI定制服装的体验与您之前的购物体验相比如何？",
-                options=["更好", "差不多", "更差", "无法比较"]
+                "How does the experience of using AI customization compare to your previous shopping experiences?",
+                options=["Better", "About the same", "Worse", "Cannot compare"]
             )
             
             ai_future = st.radio(
-                "未来您是否会考虑使用AI定制服装？",
-                options=["一定会", "可能会", "可能不会", "一定不会"]
+                "In the future, would you consider using AI for clothing customization?",
+                options=["Definitely will", "Probably will", "Probably won't", "Definitely won't"]
             )
         else:
-            # 预设设计组特有问题
             design_variety = st.slider(
-                "您对预设设计种类的满意度如何？",
+                "How satisfied are you with the variety of preset designs?",
                 min_value=1, max_value=10, value=5,
-                help="1表示非常不满意，10表示非常满意"
+                help="1 means very dissatisfied, 10 means very satisfied"
             )
             
             design_quality = st.slider(
-                "您对所选设计质量的评价如何？",
+                "How would you rate the quality of the selected design?",
                 min_value=1, max_value=10, value=5,
-                help="1表示质量很差，10表示质量极佳"
+                help="1 means very poor quality, 10 means excellent quality"
             )
             
             design_preference = st.radio(
-                "您更偏好哪种类型的服装设计？",
-                options=["大众流行款式", "少见的独特设计", "个性化定制设计", "简约基础款式"]
+                "What type of clothing design do you prefer?",
+                options=["Popular styles", "Rare unique designs", "Personalized custom designs", "Simple basic styles"]
             )
             
             design_limitation = st.radio(
-                "您是否感到预设设计限制了您的创意表达？",
-                options=["非常限制", "有些限制", "几乎没有限制", "完全不限制"]
+                "Do you feel that preset designs limit your creative expression?",
+                options=["Very limiting", "Somewhat limiting", "Barely limiting", "Not limiting at all"]
             )
         
-        # 两组共同问题
         customize_difficulty = st.slider(
-            "您认为使用本系统定制T恤的难度如何？",
+            "How difficult do you think it is to customize a T-shirt using this system?",
             min_value=1, max_value=10, value=5,
-            help="1表示非常困难，10表示非常容易"
+            help="1 means very difficult, 10 means very easy"
         )
         
-        # 购买意愿价格
         price_willing_to_pay = st.slider(
-            "您愿意为这件定制T恤支付多少元人民币？",
+            "How much are you willing to pay for this customized T-shirt (in RMB)?",
             min_value=0, max_value=500, value=100, step=10
         )
         
-        # 开放式反馈
         feedback = st.text_area(
-            "请分享您对此定制体验的任何其他反馈或建议",
+            "Please share any additional feedback or suggestions regarding this customization experience",
             height=100
         )
         
-        # 提交按钮
-        if st.button("提交反馈"):
-            # 收集所有数据
+        if st.button("Submit Feedback"):
             experiment_data = {
                 'user_id': st.session_state.user_id,
                 'experiment_group': st.session_state.experiment_group,
@@ -830,79 +807,76 @@ def show_survey_page():
                 'satisfaction_score': satisfaction_score,
                 'customize_difficulty': customize_difficulty,
                 'price_willing_to_pay': price_willing_to_pay,
-                'theme': st.session_state.selected_preset if st.session_state.experiment_group == "预设设计组" else None,
-                'design_choice': st.session_state.selected_preset if st.session_state.experiment_group == "预设设计组" else None,
+                'theme': st.session_state.selected_preset if st.session_state.experiment_group == "Preset Design Group" else None,
+                'design_choice': st.session_state.selected_preset if st.session_state.experiment_group == "Preset Design Group" else None,
                 'uniqueness_importance': st.session_state.user_info.get('uniqueness_importance'),
                 'ai_attitude': st.session_state.user_info.get('ai_attitude'),
                 'feedback': feedback
             }
             
-            # 添加不同组别的特有数据
-            if st.session_state.experiment_group == "AI定制组":
+            if st.session_state.experiment_group == "AI Customization Group":
                 experiment_data.update({
                     'ai_effectiveness': ai_effectiveness,
                     'ai_uniqueness': ai_uniqueness,
                     'ai_experience': ai_experience,
-                    'ai_future': ai_future
+                    'ai_future': ai_future,
+                    'design_variety': None,
+                    'design_quality': None,
+                    'design_preference': None,
+                    'design_limitation': None
                 })
             else:
                 experiment_data.update({
                     'design_variety': design_variety,
                     'design_quality': design_quality,
                     'design_preference': design_preference,
-                    'design_limitation': design_limitation
+                    'design_limitation': design_limitation,
+                    'ai_effectiveness': None,
+                    'ai_uniqueness': None,
+                    'ai_experience': None,
+                    'ai_future': None
                 })
             
-            # 保存数据
             if save_experiment_data(experiment_data):
                 st.session_state.submitted = True
-                st.success("感谢您的反馈！您的数据已被记录，将有助于我们的研究。")
+                st.success("Thank you for your feedback! Your data has been recorded and will help our research.")
                 st.rerun()
             else:
-                st.error("保存反馈数据失败，请重试。")
+                st.error("Failed to save feedback data, please try again.")
         
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.success("您已成功提交问卷！感谢您的参与。")
+        st.success("You have successfully submitted the questionnaire! Thank you for your participation.")
         
-        if st.button("返回主界面"):
-            # 重置会话状态，保留用户ID和实验数据
-            design_keys = [
-                'base_image', 'current_image', 'current_box_position', 
-                'generated_design', 'final_design', 'selected_preset',
-                'page', 'experiment_group', 'submitted', 'start_time'
-            ]
-            for key in design_keys:
-                if key in st.session_state:
+        if st.button("Return to Main Interface"):
+            # Reset session state
+            for key in list(st.session_state.keys()):
+                if key != 'user_id':  # Keep user ID for tracking
                     del st.session_state[key]
-            
-            # 重新初始化必要的状态
             st.session_state.page = "welcome"
-            st.session_state.start_time = datetime.datetime.now()
-            st.session_state.submitted = False
             st.rerun()
 
-# 主程序控制逻辑
+# Main program control logic
 def main():
-    # 初始化数据文件
+    # Initialize data file
     initialize_experiment_data()
     
-    # 根据当前页面显示不同内容
+    # Display different content based on the current page
     if st.session_state.page == "welcome":
         show_welcome_page()
     elif st.session_state.page == "design":
-        if st.session_state.experiment_group == "AI定制组":
+        if st.session_state.experiment_group == "AI Customization Group":
             show_ai_design_page()
-        elif st.session_state.experiment_group == "预设设计组":
+        elif st.session_state.experiment_group == "Preset Design Group":
             show_preset_design_page()
         else:
-            st.error("实验组类型错误，请返回首页重新选择")
-            if st.button("返回首页"):
+            st.error("Experiment group type error, please return to the homepage to reselect.")
+            if st.button("Return to Homepage"):
                 st.session_state.page = "welcome"
                 st.rerun()
     elif st.session_state.page == "survey":
         show_survey_page()
 
-# 运行应用
+# Run the application
 if __name__ == "__main__":
     main()
