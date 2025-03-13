@@ -378,10 +378,10 @@ def show_welcome_page():
 def show_ai_design_page():
     st.title("👕 AI定制服装实验平台")
     st.markdown("### AI定制组 - 创建您独特的T恤设计")
-
+    
     # 创建两列布局
     col1, col2 = st.columns([3, 2])
-
+    
     with col1:
         st.markdown("## 设计区域")
         
@@ -414,10 +414,6 @@ def show_ai_design_page():
             temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_point)
             st.session_state.current_image = temp_image
             st.session_state.current_box_position = new_pos
-            # 自动更新选择区域
-            x1, y1 = st.session_state.current_box_position
-            width, height = st.session_state.base_image.width, st.session_state.base_image.height
-            box_size = int(1024 * 0.25)
             st.rerun()
 
     with col2:
@@ -492,10 +488,11 @@ def show_ai_design_page():
                 file_name="custom_tshirt.png",
                 mime="image/png"
             )
-            
-            if st.button("继续到问卷"):
-                st.session_state.page = "survey"
-                st.rerun()
+        
+        # 返回主界面按钮
+        if st.button("返回主界面"):
+            st.session_state.page = "welcome"
+            st.rerun()
 
 # 预设设计组设计页面
 def show_preset_design_page():
@@ -615,10 +612,11 @@ def show_preset_design_page():
                 file_name="custom_tshirt.png",
                 mime="image/png"
             )
-            
-            if st.button("继续到问卷"):
-                st.session_state.page = "survey"
-                st.rerun()
+        
+        # 返回主界面按钮
+        if st.button("返回主界面"):
+            st.session_state.page = "welcome"
+            st.rerun()
 
 # 问卷页面
 def show_survey_page():
@@ -762,7 +760,7 @@ def show_survey_page():
     else:
         st.success("您已成功提交问卷！感谢您的参与。")
         
-        if st.button("返回首页"):
+        if st.button("返回主界面"):
             # 重置会话状态
             for key in list(st.session_state.keys()):
                 if key != 'user_id':  # 保留用户ID以便跟踪
