@@ -16,8 +16,6 @@ import json
 
 # Requires installation: pip install streamlit-image-coordinates
 from streamlit_image_coordinates import streamlit_image_coordinates
-from streamlit_drawable_canvas import st_canvas
-import cv2
 
 # ========== Deepbricks Configuration ==========
 from openai import OpenAI
@@ -458,10 +456,10 @@ def show_ai_design_page():
     
     # Create two-column layout
     col1, col2 = st.columns([3, 2])
-    
+
     with col1:
         st.markdown("## Design Area")
-        
+    
         # Load T-shirt base image
         if st.session_state.base_image is None:
             try:
@@ -474,7 +472,7 @@ def show_ai_design_page():
             except Exception as e:
                 st.error(f"Error loading white T-shirt image: {e}")
                 st.stop()
-        
+    
         st.markdown("**👇 Click anywhere on the T-shirt to move the design frame**")
         
         # Display current image and get click coordinates
@@ -483,7 +481,7 @@ def show_ai_design_page():
             current_image,
             key="shirt_image"
         )
-        
+    
         # Handle selection area logic - simplify to directly move red box
         if coordinates:
             # Update selection box at current mouse position
@@ -492,7 +490,7 @@ def show_ai_design_page():
             st.session_state.current_image = temp_image
             st.session_state.current_box_position = new_pos
             st.rerun()
-
+    
     with col2:
         st.markdown("## Design Parameters")
         
@@ -509,13 +507,13 @@ def show_ai_design_page():
             else:
                 # Generate pattern
                 prompt_text = (
-                    f"Create a decorative pattern with a completely transparent background. "
+                        f"Create a decorative pattern with a completely transparent background. "
                     f"Theme: {theme}. "
                     f"Style: {style}. "
                     f"Colors: {colors}. "
                     f"Details: {details}. "
-                    f"The pattern must have NO background, ONLY the design elements on transparency. "
-                    f"The output must be PNG with alpha channel transparency."
+                        f"The pattern must have NO background, ONLY the design elements on transparency. "
+                        f"The output must be PNG with alpha channel transparency."
                 )
                 
                 with st.spinner("🔮 Generating design..."):
@@ -524,22 +522,22 @@ def show_ai_design_page():
                     if custom_design:
                         st.session_state.generated_design = custom_design
                         
-                        # Composite on the original image
+                            # Composite on the original image
                         composite_image = st.session_state.base_image.copy()
                         
-                        # Place design at current selection position
-                        left, top = st.session_state.current_box_position
-                        box_size = int(1024 * 0.25)
-                        
-                        # Scale generated pattern to selection area size
-                        scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
-                        
-                        try:
-                            # Ensure transparency channel is used for pasting
-                            composite_image.paste(scaled_design, (left, top), scaled_design)
-                        except Exception as e:
-                            st.warning(f"Transparent channel paste failed, direct paste: {e}")
-                            composite_image.paste(scaled_design, (left, top))
+                            # Place design at current selection position
+                            left, top = st.session_state.current_box_position
+                            box_size = int(1024 * 0.25)
+                            
+                            # Scale generated pattern to selection area size
+                            scaled_design = custom_design.resize((box_size, box_size), Image.LANCZOS)
+                            
+                            try:
+                                # Ensure transparency channel is used for pasting
+                                composite_image.paste(scaled_design, (left, top), scaled_design)
+                            except Exception as e:
+                                st.warning(f"Transparent channel paste failed, direct paste: {e}")
+                                composite_image.paste(scaled_design, (left, top))
                         
                         st.session_state.final_design = composite_image
                         st.rerun()
@@ -582,157 +580,266 @@ def show_ai_design_page():
         st.session_state.page = "welcome"
         st.rerun()
 
-# Add a function to create colored t-shirt
-def create_colored_tshirt(color_hex):
-    """Create a t-shirt with specified color"""
-    try:
-        # Load the base white shirt image
-        base_shirt = Image.open("white_shirt.png").convert("RGBA")
-        
-        # Convert hex color to RGB
-        color_rgb = tuple(int(color_hex.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-        
-        # Create a colored overlay
-        colored_overlay = Image.new("RGBA", base_shirt.size, color=(*color_rgb, 180))
-        
-        # Create a mask from the original shirt (white areas become transparent)
-        r, g, b, a = base_shirt.split()
-        mask = Image.merge("L", (a,))
-        
-        # Apply the colored overlay to the shirt using the mask
-        colored_shirt = Image.new("RGBA", base_shirt.size)
-        colored_shirt.paste(base_shirt, (0, 0))
-        colored_shirt.paste(colored_overlay, (0, 0), mask)
-        
-        return colored_shirt
-    except Exception as e:
-        st.error(f"Error creating colored t-shirt: {e}")
-        return None
-
-# Update the preset design page to allow color selection and custom drawing
+# Preset Design Group design page
 def show_preset_design_page():
-    st.title("👕 Custom Design Experiment Platform")
-    st.markdown("### Custom Design Group - Create Your Own T-shirt Design")
+    st.title("👕 预制设计实验平台")
+    st.markdown("### 预制设计组 - 自定义您的T恤")
     
-    # Create tabbed interface for color selection and drawing
-    tab1, tab2 = st.tabs(["T-shirt Color", "Draw Your Design"])
+    # 创建两列布局
+    col1, col2 = st.columns([3, 2])
     
-    with tab1:
-        st.markdown("## Choose T-shirt Color")
+    with col1:
+        st.markdown("## 设计区域")
         
-        # Color picker for t-shirt
-        color = st.color_picker("Select a color for your t-shirt", "#FFFFFF")
-        
-        if st.button("Apply Color"):
-            # Create colored t-shirt
-            colored_shirt = create_colored_tshirt(color)
-            if colored_shirt:
-                st.session_state.base_image = colored_shirt
-                st.session_state.current_image = colored_shirt.copy()
-                st.success("Color applied successfully!")
-                st.rerun()
-    
-    with tab2:
-        st.markdown("## Draw Your Design")
-        
-        # Display the current t-shirt
-        if st.session_state.base_image is not None:
-            st.image(st.session_state.base_image, caption="Your T-shirt", use_container_width=True)
-        else:
+        # 加载T恤基础图像
+        if st.session_state.base_image is None:
             try:
                 base_image = Image.open("white_shirt.png").convert("RGBA")
                 st.session_state.base_image = base_image
-                st.session_state.current_image = base_image.copy()
-                st.image(base_image, caption="Default White T-shirt", use_container_width=True)
+                st.session_state.original_base_image = base_image.copy()  # 保存原始白色T恤图像
+                # 初始化，在中心绘制选择框
+                initial_image, initial_pos = draw_selection_box(base_image)
+                st.session_state.current_image = initial_image
+                st.session_state.current_box_position = initial_pos
             except Exception as e:
-                st.error(f"Error loading white T-shirt image: {e}")
+                st.error(f"加载白色T恤图像时出错: {e}")
                 st.stop()
         
-        # Drawing canvas settings
-        st.markdown("### Draw Pattern Below")
-        stroke_width = st.slider("Brush Width", 1, 25, 3)
-        stroke_color = st.color_picker("Brush Color", "#000000")
-        bg_color = st.color_picker("Background Color", "#FFFFFF")
-        bg_opacity = st.slider("Background Opacity", 0.0, 1.0, 0.1)
+        st.markdown("**👇 点击T恤上的任意位置移动设计框或直接绘画**")
         
-        # Create a transparent canvas for drawing
-        canvas_result = st_canvas(
-            fill_color=f"rgba(255, 255, 255, {bg_opacity})",
-            stroke_width=stroke_width,
-            stroke_color=stroke_color,
-            background_color=bg_color,
-            height=300,
-            width=400,
-            drawing_mode="freedraw",
-            key="canvas",
+        # 显示当前图像并获取点击坐标
+        current_image = st.session_state.current_image
+        coordinates = streamlit_image_coordinates(
+            current_image,
+            key="shirt_image"
         )
         
-        # Apply drawing to t-shirt
-        if canvas_result.image_data is not None and st.button("Apply Drawing to T-shirt"):
-            # Convert the canvas data to an image with transparency
-            canvas_img = canvas_result.image_data
-            
-            # Create PIL image from canvas data
-            canvas_pil = Image.fromarray(canvas_img.astype('uint8'), 'RGBA')
-            
-            # Make white/background color transparent
-            data = np.array(canvas_pil)
-            # Create mask for nearly white pixels (adjust threshold as needed)
-            mask = (data[:,:,0] > 240) & (data[:,:,1] > 240) & (data[:,:,2] > 240)
-            # Set alpha channel to 0 for background pixels
-            data[:,:,3] = np.where(mask, 0, 255)
-            transparent_canvas = Image.fromarray(data)
-            
-            # Apply the drawing to the t-shirt
-            if st.session_state.base_image is not None:
-                composite = st.session_state.base_image.copy()
-                # Center the drawing on the t-shirt (adjust position as needed)
-                paste_x = (composite.width - transparent_canvas.width) // 2
-                paste_y = composite.height // 3  # Position near the chest area
+        # 处理选择区域逻辑或绘画逻辑
+        if coordinates:
+            # 如果处于绘画模式
+            if 'drawing_mode' in st.session_state and st.session_state.drawing_mode:
+                # 在T恤上绘画
+                if 'drawn_points' not in st.session_state:
+                    st.session_state.drawn_points = []
                 
-                try:
-                    # Paste with transparency
-                    composite.paste(transparent_canvas, (paste_x, paste_y), transparent_canvas)
-                    st.session_state.final_design = composite
-                    st.success("Drawing applied to t-shirt!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error applying drawing: {e}")
+                st.session_state.drawn_points.append((coordinates["x"], coordinates["y"]))
+                
+                # 在当前图像上绘制点
+                draw_img = st.session_state.current_image.copy()
+                draw = ImageDraw.Draw(draw_img)
+                
+                # 获取绘画颜色和大小
+                draw_color = st.session_state.get('draw_color', (255, 0, 0, 255))
+                brush_size = st.session_state.get('brush_size', 5)
+                
+                # 绘制所有点
+                for point in st.session_state.drawn_points:
+                    draw.ellipse(
+                        [(point[0]-brush_size, point[1]-brush_size), 
+                         (point[0]+brush_size, point[1]+brush_size)], 
+                        fill=draw_color
+                    )
+                
+                st.session_state.current_image = draw_img
+                st.rerun()
+            else:
+                # 移动选择框
+                current_point = (coordinates["x"], coordinates["y"])
+                # 获取当前T恤图像（可能已经应用了颜色）
+                base_img = st.session_state.base_image.copy()
+                temp_image, new_pos = draw_selection_box(base_img, current_point)
+                st.session_state.current_image = temp_image
+                st.session_state.current_box_position = new_pos
+                st.rerun()
+
+    with col2:
+        st.markdown("## 自定义选项")
+        
+        # 添加颜色选择器
+        st.markdown("### 选择T恤颜色")
+        color_options = {
+            "白色": (255, 255, 255),
+            "黑色": (0, 0, 0),
+            "红色": (255, 0, 0),
+            "蓝色": (0, 0, 255),
+            "绿色": (0, 128, 0),
+            "黄色": (255, 255, 0),
+            "粉色": (255, 192, 203),
+            "紫色": (128, 0, 128)
+        }
+        
+        selected_color_name = st.selectbox(
+            "T恤颜色",
+            options=list(color_options.keys()),
+            index=0
+        )
+        
+        selected_color = color_options[selected_color_name]
+        
+        # 显示颜色预览
+        col_preview1, col_preview2 = st.columns([1, 4])
+        with col_preview1:
+            preview_color = Image.new("RGB", (50, 50), selected_color)
+            st.image(preview_color, caption="颜色预览")
+        
+        # 应用颜色按钮
+        if st.button("应用颜色"):
+            # 创建颜色滤镜
+            original_image = st.session_state.original_base_image.copy()
+            colored_image = original_image.copy()
+            
+            # 对非透明像素应用颜色滤镜
+            data = np.array(colored_image)
+            # 获取非完全透明的像素
+            mask = data[:, :, 3] > 0
+            
+            # 创建颜色混合因子（保持一些原始细节）
+            blend_factor = 0.8
+            
+            # 对RGB通道应用颜色
+            for i in range(3):
+                data[:, :, i][mask] = (
+                    data[:, :, i][mask] * (1 - blend_factor) + 
+                    selected_color[i] * blend_factor
+                )
+            
+            # 转回图像
+            colored_image = Image.fromarray(data)
+            st.session_state.base_image = colored_image
+            
+            # 使用新的彩色T恤更新当前图像
+            current_point = st.session_state.current_box_position
+            temp_image, _ = draw_selection_box(colored_image, current_point)
+            st.session_state.current_image = temp_image
+            st.rerun()
+        
+        # 绘画模式选项
+        st.markdown("### 直接绘画选项")
+        drawing_mode = st.checkbox("启用绘画模式", value=False)
+        st.session_state.drawing_mode = drawing_mode
+        
+        if drawing_mode:
+            # 绘画设置
+            draw_color_name = st.selectbox(
+                "绘画颜色",
+                options=list(color_options.keys()),
+                index=1  # 默认黑色
+            )
+            st.session_state.draw_color = color_options[draw_color_name] + (255,)  # 添加alpha通道
+            
+            st.session_state.brush_size = st.slider("笔刷大小", 1, 20, 5)
+            
+            if st.button("清除绘画"):
+                if 'drawn_points' in st.session_state:
+                    st.session_state.drawn_points = []
+                # 重置当前图像
+                current_point = st.session_state.current_box_position
+                temp_image, _ = draw_selection_box(st.session_state.base_image, current_point)
+                st.session_state.current_image = temp_image
+                st.rerun()
+        else:
+            # 预制设计选择
+            st.markdown("### 选择预制设计")
+            
+            # 获取预设设计文件夹中的所有图像
+            predesign_folder = "predesign"
+            design_files = []
+            
+            # 确保文件夹存在
+            if not os.path.exists(predesign_folder):
+                st.error(f"预制设计文件夹未找到: {predesign_folder}，请确保它存在。")
+            else:
+                # 获取所有支持的图像文件
+                for file in os.listdir(predesign_folder):
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                        design_files.append(file)
+                
+                if not design_files:
+                    st.warning(f"{predesign_folder} 文件夹中未找到图像文件。")
+                else:
+                    # 显示图像选择界面
+                    selected_file = st.radio(
+                        "可用设计",
+                        options=design_files,
+                        horizontal=True
+                    )
+                    
+                    st.session_state.selected_preset = selected_file
+                    
+                    # 显示选定的设计
+                    if st.session_state.selected_preset:
+                        try:
+                            # 加载设计图像
+                            design_path = os.path.join(predesign_folder, selected_file)
+                            preset_design = Image.open(design_path).convert("RGBA")
+                            st.image(preset_design, caption=f"预制设计: {selected_file}", use_container_width=True)
+                            
+                            # 应用设计按钮
+                            if st.button("应用到T恤"):
+                                st.session_state.generated_design = preset_design
+                                
+                                # 合成到原始图像
+                                composite_image = st.session_state.base_image.copy()
+                                
+                                # 在当前选择位置放置设计
+                                left, top = st.session_state.current_box_position
+                                box_size = int(1024 * 0.25)
+                                
+                                # 将预设图案缩放到选择区域大小
+                                scaled_design = preset_design.resize((box_size, box_size), Image.LANCZOS)
+                                
+                                try:
+                                    # 确保透明通道用于粘贴
+                                    composite_image.paste(scaled_design, (left, top), scaled_design)
+                                except Exception as e:
+                                    st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
+                                    composite_image.paste(scaled_design, (left, top))
+                        
+                            st.session_state.final_design = composite_image
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"处理预制设计时出错: {e}")
     
-    # Display final design if available
+    # 显示最终效果 - 保持与AI自定义页面一致的布局
     if st.session_state.final_design is not None:
-        st.markdown("### Final Result")
+        st.markdown("### 最终效果")
         st.image(st.session_state.final_design, use_container_width=True)
         
-        # Provide download option
+        # 提供下载选项
         col1, col2 = st.columns(2)
         with col1:
             buf = BytesIO()
             st.session_state.final_design.save(buf, format="PNG")
             buf.seek(0)
             st.download_button(
-                label="💾 Download Custom Design",
+                label="💾 下载自定义设计",
                 data=buf,
                 file_name="custom_tshirt.png",
                 mime="image/png"
             )
-            
+        
         with col2:
-            # Add confirm completion button that navigates to the survey page
-            if st.button("Confirm Completion"):
+            # 确认完成按钮，导航到问卷调查页面
+            if st.button("确认完成"):
                 st.session_state.page = "survey"
                 st.rerun()
-
-    # Return to main interface button
-    if st.button("Return to Main Page"):
-        # Clear all design-related states
+    
+    # 返回主界面按钮
+    if st.button("返回主页"):
+        # 清除所有设计相关状态
         st.session_state.base_image = None
         st.session_state.current_image = None
         st.session_state.current_box_position = None
         st.session_state.generated_design = None
         st.session_state.final_design = None
-        st.session_state.selected_preset = None
-        # Only change page state, retain user info and experiment group
+        st.session_state.selected_preset = None  # 清除选定的预制设计
+        if 'drawing_mode' in st.session_state:
+            del st.session_state.drawing_mode
+        if 'drawn_points' in st.session_state:
+            del st.session_state.drawn_points
+        if 'original_base_image' in st.session_state:
+            del st.session_state.original_base_image
+        # 只改变页面状态，保留用户信息和实验组
         st.session_state.page = "welcome"
         st.rerun()
 
