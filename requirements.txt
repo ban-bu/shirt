@@ -6,4 +6,4 @@ Pillow
 cairosvg
 numpy
 streamlit_image_coordinates
-cv2
+opencv
