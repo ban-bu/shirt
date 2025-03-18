@@ -302,13 +302,13 @@ initialize_experiment_data()
 
 # Welcome and information collection page
 def show_welcome_page():
-    st.title("👕 AI Customized Clothing Consumer Behavior Experiment")
+    st.title("👕 AI Co-Creation Clothing Consumer Behavior Experiment")
     
     with st.container():
         st.markdown('<div class="welcome-card">', unsafe_allow_html=True)
         st.markdown("### Welcome to our experiment!")
         st.markdown("""
-        This experiment aims to study the impact of different clothing customization methods on consumer purchasing behavior. You will have the opportunity to experience the T-shirt customization process and share your feedback.
+        This experiment aims to study the impact of AI Co-Creation on consumer purchasing behavior. You will have the opportunity to experience the T-shirt customization process and share your feedback.
         
         **Experiment Process**:
         1. Fill in your basic information
