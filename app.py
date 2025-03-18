@@ -26,7 +26,7 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 # Page configuration
 st.set_page_config(
-    page_title="AI Customized Clothing Consumer Behavior Experiment",
+    page_title="AI Co-Creation Clothing Consumer Behavior Experiment",
     page_icon="👕",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -451,8 +451,8 @@ def show_welcome_page():
 
 # AI Customization Group design page
 def show_ai_design_page():
-    st.title("👕 AI Customization Experiment Platform")
-    st.markdown("### AI Customization Group - Create Your Unique T-shirt Design")
+    st.title("👕 AI Co-Creation Experiment Platform")
+    st.markdown("### AI Co-Creation Group - Create Your Unique T-shirt Design")
     
     # Create two-column layout
     col1, col2 = st.columns([3, 2])
