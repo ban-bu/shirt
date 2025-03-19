@@ -589,23 +589,34 @@ def show_preset_design_page():
             st.rerun()
 
     with col2:
-        st.markdown("## Choose Preset Design")
+        st.markdown("## Choose Design Method")
         
-        # Display preset design image options
-        st.markdown("Select one from the designs below:")
+        # 添加设计方法选择
+        design_method = st.radio(
+            "How would you like to create your design?",
+            options=["Choose preset design", "Draw your own design"],
+            horizontal=True
+        )
         
-        # Get all images from predesign folder
-        predesign_folder = "predesign"
-        design_files = []
-        
-        # Ensure folder exists
-        if not os.path.exists(predesign_folder):
-            st.error(f"Preset design folder not found: {predesign_folder}, please make sure it exists.")
-        else:
-            # Get all supported image files
-            for file in os.listdir(predesign_folder):
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    design_files.append(file)
+        if design_method == "Choose preset design":
+            # 原有预设设计的代码
+            st.markdown("## Choose Preset Design")
+            
+            # Display preset design image options
+            st.markdown("Select one from the designs below:")
+            
+            # Get all images from predesign folder
+            predesign_folder = "predesign"
+            design_files = []
+            
+            # Ensure folder exists
+            if not os.path.exists(predesign_folder):
+                st.error(f"Preset design folder not found: {predesign_folder}, please make sure it exists.")
+            else:
+                # Get all supported image files
+                for file in os.listdir(predesign_folder):
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                        design_files.append(file)
             
             if not design_files:
                 st.warning(f"No image files found in the {predesign_folder} folder.")
@@ -653,6 +664,153 @@ def show_preset_design_page():
                             st.rerun()
                     except Exception as e:
                         st.error(f"Error processing preset design: {e}")
+        
+        else:  # "Draw your own design"
+            st.markdown("## Draw Your Own Design")
+            st.markdown("Use the canvas below to draw your own pattern:")
+            
+            # 创建绘图Canvas
+            canvas_html = """
+            <div style="display: flex; flex-direction: column; align-items: center; margin: 10px 0;">
+                <canvas id="drawingCanvas" width="300" height="300" style="border: 2px solid #f63366; border-radius: 5px;"></canvas>
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <button id="clearCanvas" style="padding: 5px 10px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 4px;">Clear</button>
+                    <button id="applyDrawing" style="padding: 5px 10px; background-color: #f63366; color: white; border: none; border-radius: 4px;">Apply to T-shirt</button>
+                </div>
+            </div>
+            
+            <script>
+                const canvas = document.getElementById('drawingCanvas');
+                const ctx = canvas.getContext('2d');
+                let isDrawing = false;
+                let lastX = 0;
+                let lastY = 0;
+                
+                // 设置白色背景
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 设置画笔样式
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = 'black';
+                
+                // 绘画函数
+                function draw(e) {
+                    if (!isDrawing) return;
+                    
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(lastX, lastY);
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                    
+                    lastX = x;
+                    lastY = y;
+                }
+                
+                // 事件监听
+                canvas.addEventListener('mousedown', (e) => {
+                    isDrawing = true;
+                    const rect = canvas.getBoundingClientRect();
+                    lastX = e.clientX - rect.left;
+                    lastY = e.clientY - rect.top;
+                });
+                
+                canvas.addEventListener('mousemove', draw);
+                canvas.addEventListener('mouseup', () => isDrawing = false);
+                canvas.addEventListener('mouseout', () => isDrawing = false);
+                
+                // 清除画布
+                document.getElementById('clearCanvas').addEventListener('click', () => {
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                });
+                
+                // 应用到T恤
+                document.getElementById('applyDrawing').addEventListener('click', () => {
+                    const imageData = canvas.toDataURL('image/png');
+                    window.parent.postMessage({
+                        type: 'drawing',
+                        image: imageData
+                    }, '*');
+                });
+            </script>
+            """
+            
+            # 添加一个color picker控件让用户选择画笔颜色
+            pen_color = st.color_picker("选择画笔颜色", "#000000")
+            
+            # 添加画笔粗细滑块
+            pen_size = st.slider("画笔粗细", 1, 20, 5)
+            
+            # 更新canvas HTML以使用选定的颜色和粗细
+            canvas_html = canvas_html.replace('ctx.lineWidth = 5;', f'ctx.lineWidth = {pen_size};')
+            canvas_html = canvas_html.replace("ctx.strokeStyle = 'black';", f"ctx.strokeStyle = '{pen_color}';")
+            
+            # 渲染canvas
+            html(canvas_html, height=400)
+            
+            # 处理从JavaScript传递的绘图数据
+            if 'drawing_data' not in st.session_state:
+                st.session_state.drawing_data = None
+                
+            # 为了接收JavaScript消息，创建一个回调函数
+            components.html(
+                """
+                <script>
+                window.addEventListener('message', function(e) {
+                    if (e.data.type === 'drawing') {
+                        window.parent.postMessage({
+                            type: 'streamlit:setComponentValue',
+                            value: e.data.image
+                        }, '*');
+                    }
+                });
+                </script>
+                """,
+                height=0,
+                key="drawing_receiver"
+            )
+            
+            # 检查是否收到了绘图数据
+            if st.session_state.drawing_data:
+                # 将base64图像数据转换为PIL图像
+                try:
+                    image_data = base64.b64decode(st.session_state.drawing_data.split(',')[1])
+                    drawn_design = Image.open(BytesIO(image_data)).convert("RGBA")
+                    
+                    st.image(drawn_design, caption="Your Drawing", use_container_width=True)
+                    
+                    # 应用到T恤的按钮
+                    if st.button("Apply Drawing to T-shirt"):
+                        # 与预设设计相同的代码，但使用drawn_design
+                        st.session_state.generated_design = drawn_design
+                        
+                        # 合成到原始图像
+                        composite_image = st.session_state.base_image.copy()
+                        
+                        # 放置设计到当前选择位置
+                        left, top = st.session_state.current_box_position
+                        box_size = int(1024 * 0.25)
+                        
+                        # 缩放绘制的图案到选择区域大小
+                        scaled_design = drawn_design.resize((box_size, box_size), Image.LANCZOS)
+                        
+                        try:
+                            composite_image.paste(scaled_design, (left, top), scaled_design)
+                        except Exception as e:
+                            st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
+                            composite_image.paste(scaled_design, (left, top))
+                        
+                        st.session_state.final_design = composite_image
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"处理绘图数据时出错: {e}")
     
     # Display final effect - maintain consistent layout with AI customization page
     if st.session_state.final_design is not None:
