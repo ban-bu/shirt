@@ -675,129 +675,160 @@ def show_preset_design_page():
             pen_color = st.color_picker("选择画笔颜色", "#000000")
             pen_size = st.slider("画笔粗细", 1, 20, 5)
             
-            # 创建一个会话状态来存储画布图像数据
-            if 'drawing_data' not in st.session_state:
-                st.session_state.drawing_data = None
+            # 创建一个简单的绘图方法
+            st.write("请在下方画布中绘制您的设计：")
             
-            # 添加一个回调函数来接收从JavaScript传来的绘图数据
-            def handle_drawing_data(data):
-                st.session_state.drawing_data = data
-                st.rerun()
-            
-            # 创建绘图Canvas
-            canvas_html = """
-            <div style="display: flex; flex-direction: column; align-items: center; margin: 10px 0;">
-                <canvas id="drawingCanvas" width="300" height="300" style="border: 2px solid #f63366; border-radius: 5px;"></canvas>
-                <div style="margin-top: 10px; display: flex; gap: 10px;">
-                    <button id="clearCanvas" style="padding: 5px 10px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 4px;">Clear</button>
-                    <button id="applyDrawing" style="padding: 5px 10px; background-color: #f63366; color: white; border: none; border-radius: 4px;">Apply to T-shirt</button>
-                </div>
-            </div>
-            
+            # 使用简单的HTML画布
+            canvas_code = f"""
+            <canvas id="canvas" width="400" height="400" 
+                style="border:1px solid #000000; background-color: white;"></canvas>
+            <br>
+            <button id="clear">清除画布</button>
+            <button id="save">应用到T恤</button>
+
             <script>
-                const canvas = document.getElementById('drawingCanvas');
-                const ctx = canvas.getContext('2d');
-                let isDrawing = false;
-                let lastX = 0;
-                let lastY = 0;
+                // 获取画布元素
+                var canvas = document.getElementById('canvas');
+                var ctx = canvas.getContext('2d');
+                var painting = false;
                 
-                // 设置白色背景
-                ctx.fillStyle = 'white';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // 设置画笔样式
-                ctx.lineJoin = 'round';
+                // 设置画笔颜色和大小
+                ctx.strokeStyle = '{pen_color}';
+                ctx.lineWidth = {pen_size};
                 ctx.lineCap = 'round';
-                ctx.lineWidth = """ + str(pen_size) + """;
-                ctx.strokeStyle = '""" + pen_color + """';
+                ctx.lineJoin = 'round';
                 
-                // 绘画函数
-                function draw(e) {
-                    if (!isDrawing) return;
-                    
-                    const rect = canvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    
+                // 鼠标按下事件
+                canvas.addEventListener('mousedown', startPosition);
+                // 鼠标移动事件
+                canvas.addEventListener('mousemove', draw);
+                // 鼠标释放事件
+                canvas.addEventListener('mouseup', endPosition);
+                // 鼠标离开画布事件
+                canvas.addEventListener('mouseout', endPosition);
+                
+                // 清除画布事件
+                document.getElementById('clear').addEventListener('click', clearCanvas);
+                // 保存图像事件
+                document.getElementById('save').addEventListener('click', saveImage);
+                
+                // 开始绘制
+                function startPosition(e) {{
+                    painting = true;
+                    draw(e);
+                }}
+                
+                // 结束绘制
+                function endPosition() {{
+                    painting = false;
                     ctx.beginPath();
-                    ctx.moveTo(lastX, lastY);
+                }}
+                
+                // 绘制
+                function draw(e) {{
+                    if (!painting) return;
+                    
+                    var rect = canvas.getBoundingClientRect();
+                    var x = e.clientX - rect.left;
+                    var y = e.clientY - rect.top;
+                    
                     ctx.lineTo(x, y);
                     ctx.stroke();
-                    
-                    lastX = x;
-                    lastY = y;
-                }
-                
-                // 事件监听
-                canvas.addEventListener('mousedown', (e) => {
-                    isDrawing = true;
-                    const rect = canvas.getBoundingClientRect();
-                    lastX = e.clientX - rect.left;
-                    lastY = e.clientY - rect.top;
-                });
-                
-                canvas.addEventListener('mousemove', draw);
-                canvas.addEventListener('mouseup', () => isDrawing = false);
-                canvas.addEventListener('mouseout', () => isDrawing = false);
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                }}
                 
                 // 清除画布
-                document.getElementById('clearCanvas').addEventListener('click', () => {
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                });
+                function clearCanvas() {{
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.beginPath();
+                }}
                 
-                // 应用到T恤
-                document.getElementById('applyDrawing').addEventListener('click', () => {
-                    const imageData = canvas.toDataURL('image/png');
-                    // 直接向Streamlit组件发送数据
-                    window.parent.postMessage({
-                        type: 'streamlit:setComponentValue',
-                        value: imageData
-                    }, '*');
-                });
+                // 保存图像
+                function saveImage() {{
+                    var dataURL = canvas.toDataURL('image/png');
+                    
+                    // 向Streamlit发送数据
+                    var data = {{
+                        dataURL: dataURL
+                    }};
+                    
+                    fetch("", {{
+                        method: "POST",
+                        body: JSON.stringify(data),
+                        headers: {{
+                            "Content-Type": "application/json"
+                        }}
+                    }})
+                    .then(response => {{
+                        if (!response.ok) throw new Error("网络响应出错");
+                        return response.json();
+                    }})
+                    .then(data => {{
+                        if (data.success) {{
+                            // 成功后提示
+                            alert("设计已应用到T恤");
+                            window.parent.postMessage({{
+                                type: 'streamlit:setComponentValue',
+                                value: dataURL
+                            }}, '*');
+                        }}
+                    }})
+                    .catch(error => {{
+                        console.error("Error:", error);
+                    }});
+                }}
             </script>
             """
             
-            # 使用组件渲染canvas，并设置回调
-            drawing_result = html(canvas_html, height=400)
+            # 使用HTML组件渲染画布
+            drawing_result = html(canvas_code, height=450)
             
-            # 如果接收到了画布数据，则显示并处理
+            # 创建一个应用按钮，用于当画布值返回时应用到T恤
             if drawing_result:
-                st.session_state.drawing_data = drawing_result
+                st.success("已接收到您的绘图，点击下方按钮应用到T恤")
                 
-            if st.session_state.drawing_data:
+                # 将base64图像数据转换为PIL图像
                 try:
-                    # 将base64图像数据转换为PIL图像
-                    image_data = base64.b64decode(st.session_state.drawing_data.split(',')[1])
-                    drawn_design = Image.open(BytesIO(image_data)).convert("RGBA")
-                    
-                    st.image(drawn_design, caption="您的绘图", use_container_width=True)
-                    
-                    # 应用到T恤的按钮
-                    if st.button("应用绘图到T恤"):
-                        # 与预设设计相同的代码，但使用drawn_design
-                        st.session_state.generated_design = drawn_design
+                    # 确保drawing_result是字符串
+                    if isinstance(drawing_result, str) and drawing_result.startswith("data:image"):
+                        # 提取base64数据部分
+                        image_data = base64.b64decode(drawing_result.split(',')[1])
+                        drawn_design = Image.open(BytesIO(image_data)).convert("RGBA")
                         
-                        # 合成到原始图像
-                        composite_image = st.session_state.base_image.copy()
+                        st.image(drawn_design, caption="您的设计", use_container_width=True)
                         
-                        # 放置设计到当前选择位置
-                        left, top = st.session_state.current_box_position
-                        box_size = int(1024 * 0.25)
-                        
-                        # 缩放绘制的图案到选择区域大小
-                        scaled_design = drawn_design.resize((box_size, box_size), Image.LANCZOS)
-                        
-                        try:
-                            composite_image.paste(scaled_design, (left, top), scaled_design)
-                        except Exception as e:
-                            st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
-                            composite_image.paste(scaled_design, (left, top))
-                        
-                        st.session_state.final_design = composite_image
-                        st.rerun()
+                        # 应用到T恤的按钮
+                        if st.button("将设计应用到T恤"):
+                            # 保存设计到会话状态
+                            st.session_state.generated_design = drawn_design
+                            
+                            # 合成到原始图像
+                            composite_image = st.session_state.base_image.copy()
+                            
+                            # 放置设计到当前选择位置
+                            left, top = st.session_state.current_box_position
+                            box_size = int(1024 * 0.25)
+                            
+                            # 缩放绘制的图案到选择区域大小
+                            scaled_design = drawn_design.resize((box_size, box_size), Image.LANCZOS)
+                            
+                            try:
+                                composite_image.paste(scaled_design, (left, top), scaled_design)
+                            except Exception as e:
+                                st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
+                                composite_image.paste(scaled_design, (left, top))
+                            
+                            # 保存最终设计
+                            st.session_state.final_design = composite_image
+                            st.rerun()
+                    else:
+                        # 调试信息
+                        st.write("绘图数据不符合预期格式，请重新绘制")
                 except Exception as e:
-                    st.error(f"处理绘图数据时出错: {e}")
+                    st.error(f"处理绘图数据时出错: {str(e)}")
+                    # 调试信息
+                    st.write(f"绘图数据类型: {type(drawing_result)}")
     
     # Display final effect - maintain consistent layout with AI customization page
     if st.session_state.final_design is not None:
