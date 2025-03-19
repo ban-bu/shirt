@@ -675,18 +675,14 @@ def show_preset_design_page():
             pen_color = st.color_picker("选择画笔颜色", "#000000")
             pen_size = st.slider("画笔粗细", 1, 20, 5)
             
-            # 添加一个回调函数来处理画布数据
-            def handle_canvas_data():
-                if "canvas_data" not in st.session_state:
-                    st.session_state.canvas_data = None
-                
-                # 创建一个容器来接收画布数据
-                canvas_data_receiver = st.empty()
-                
-                return canvas_data_receiver
-
-            # 创建一个容器来接收画布数据
-            canvas_data_receiver = handle_canvas_data()
+            # 创建一个会话状态来存储画布图像数据
+            if 'drawing_data' not in st.session_state:
+                st.session_state.drawing_data = None
+            
+            # 添加一个回调函数来接收从JavaScript传来的绘图数据
+            def handle_drawing_data(data):
+                st.session_state.drawing_data = data
+                st.rerun()
             
             # 创建绘图Canvas
             canvas_html = """
@@ -753,32 +749,33 @@ def show_preset_design_page():
                 // 应用到T恤
                 document.getElementById('applyDrawing').addEventListener('click', () => {
                     const imageData = canvas.toDataURL('image/png');
-                    // 直接更新 session state
+                    // 直接向Streamlit组件发送数据
                     window.parent.postMessage({
                         type: 'streamlit:setComponentValue',
-                        data: imageData
+                        value: imageData
                     }, '*');
                 });
             </script>
             """
             
-            # 渲染canvas
-            html(canvas_html, height=400)
+            # 使用组件渲染canvas，并设置回调
+            drawing_result = html(canvas_html, height=400)
             
-            # 添加一个隐藏的组件来接收画布数据
-            canvas_data = st.text_input("Canvas Data", key="canvas_data", label_visibility="hidden")
-            
-            # 如果收到了画布数据
-            if canvas_data:
+            # 如果接收到了画布数据，则显示并处理
+            if drawing_result:
+                st.session_state.drawing_data = drawing_result
+                
+            if st.session_state.drawing_data:
                 try:
                     # 将base64图像数据转换为PIL图像
-                    image_data = base64.b64decode(canvas_data.split(',')[1])
+                    image_data = base64.b64decode(st.session_state.drawing_data.split(',')[1])
                     drawn_design = Image.open(BytesIO(image_data)).convert("RGBA")
                     
-                    st.image(drawn_design, caption="Your Drawing", use_container_width=True)
+                    st.image(drawn_design, caption="您的绘图", use_container_width=True)
                     
                     # 应用到T恤的按钮
-                    if st.button("Apply Drawing to T-shirt"):
+                    if st.button("应用绘图到T恤"):
+                        # 与预设设计相同的代码，但使用drawn_design
                         st.session_state.generated_design = drawn_design
                         
                         # 合成到原始图像
