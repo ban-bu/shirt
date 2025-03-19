@@ -748,14 +748,14 @@ def show_preset_design_page():
             </script>
             """
             
-            # 渲染canvas - 使用正确的导入函数
+            # 渲染canvas - 移除key参数
             html(canvas_html, height=400)
             
             # 处理从JavaScript传递的绘图数据
             if 'drawing_data' not in st.session_state:
                 st.session_state.drawing_data = None
                 
-            # 为了接收JavaScript消息，创建一个回调函数
+            # 为了接收JavaScript消息，创建一个回调函数 - 移除key参数
             html(
                 """
                 <script>
@@ -769,8 +769,7 @@ def show_preset_design_page():
                 });
                 </script>
                 """,
-                height=0,
-                key="drawing_receiver"
+                height=0
             )
             
             # 检查是否收到了绘图数据
