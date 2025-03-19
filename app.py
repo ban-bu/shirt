@@ -677,53 +677,48 @@ def show_preset_design_page():
             
             pen_color = st.color_picker("选择画笔颜色", "#000000")
             pen_size = st.slider("画笔粗细", 1, 20, 5)
+            
+            # 绘图画布 - 单列显示，没有实时预览
+            canvas_result = st_canvas(
+                fill_color="rgba(255, 255, 255, 0.3)",  # 填充颜色
+                stroke_width=pen_size,  # 笔画宽度
+                stroke_color=pen_color,  # 笔画颜色
+                background_color="#ffffff",  # 背景颜色
+                height=400,
+                width=400,
+                drawing_mode="freedraw",  # 绘制模式
+                key="canvas",
+            )
 
-            # 分成两列：左边是画布，右边是实时预览
-            draw_col, preview_col = st.columns([1, 1])
-            
-            with draw_col:
-                # 绘图画布
-                canvas_result = st_canvas(
-                    fill_color="rgba(255, 255, 255, 0.3)",  # 填充颜色
-                    stroke_width=pen_size,  # 笔画宽度
-                    stroke_color=pen_color,  # 笔画颜色
-                    background_color="#ffffff",  # 背景颜色
-                    height=350,
-                    width=350,
-                    drawing_mode="freedraw",  # 绘制模式
-                    key="canvas",
-                    update_streamlit=True  # 实时更新
-                )
-            
             # 检查是否有绘图
             if canvas_result.image_data is not None:
-                # 将numpy数组转换为PIL图像
-                drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
-                
-                # 创建实时预览图
-                preview_image = st.session_state.base_image.copy()
-                left, top = st.session_state.current_box_position
-                box_size = int(1024 * 0.25)
-                
-                # 缩放绘制的图案到选择区域大小
-                scaled_design = drawn_design.resize((box_size, box_size), Image.LANCZOS)
-                
-                try:
-                    preview_image.paste(scaled_design, (left, top), scaled_design)
-                except Exception as e:
-                    # 直接粘贴而不使用透明通道
-                    preview_image.paste(scaled_design, (left, top))
-                
-                # 在右侧预览栏中显示实时效果
-                with preview_col:
-                    st.markdown("### 实时预览")
-                    st.image(preview_image, caption="T恤预览", use_container_width=True)
+                # 应用到T恤的按钮
+                if st.button("将设计应用到T恤"):
+                    # 将numpy数组转换为PIL图像
+                    drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
                     
-                    # 确认按钮
-                    if st.button("确认此设计"):
-                        st.session_state.generated_design = drawn_design
-                        st.session_state.final_design = preview_image
-                        st.rerun()
+                    # 保存设计到会话状态
+                    st.session_state.generated_design = drawn_design
+                    
+                    # 合成到原始图像
+                    composite_image = st.session_state.base_image.copy()
+                    
+                    # 放置设计到当前选择位置
+                    left, top = st.session_state.current_box_position
+                    box_size = int(1024 * 0.25)
+                    
+                    # 缩放绘制的图案到选择区域大小
+                    scaled_design = drawn_design.resize((box_size, box_size), Image.LANCZOS)
+                    
+                    try:
+                        composite_image.paste(scaled_design, (left, top), scaled_design)
+                    except Exception as e:
+                        st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
+                        composite_image.paste(scaled_design, (left, top))
+                    
+                    # 保存最终设计
+                    st.session_state.final_design = composite_image
+                    st.rerun()
     
     # Display final effect - maintain consistent layout with AI customization page
     if st.session_state.final_design is not None:
