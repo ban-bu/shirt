@@ -18,7 +18,7 @@ import json
 from streamlit_image_coordinates import streamlit_image_coordinates
 
 # 在导入部分添加以下内容
-from streamlit.components.v1 import html as components_html
+from streamlit.components.v1 import html
 
 # ========== Deepbricks Configuration ==========
 from openai import OpenAI
@@ -672,10 +672,7 @@ def show_preset_design_page():
             st.markdown("## Draw Your Own Design")
             st.markdown("Use the canvas below to draw your own pattern:")
             
-            # 添加一个color picker控件让用户选择画笔颜色
             pen_color = st.color_picker("选择画笔颜色", "#000000")
-            
-            # 添加画笔粗细滑块
             pen_size = st.slider("画笔粗细", 1, 20, 5)
             
             # 创建绘图Canvas
@@ -752,14 +749,14 @@ def show_preset_design_page():
             """
             
             # 渲染canvas - 使用正确的导入函数
-            components_html(canvas_html, height=400)
+            html(canvas_html, height=400)
             
             # 处理从JavaScript传递的绘图数据
             if 'drawing_data' not in st.session_state:
                 st.session_state.drawing_data = None
                 
             # 为了接收JavaScript消息，创建一个回调函数
-            components_html(
+            html(
                 """
                 <script>
                 window.addEventListener('message', function(e) {
