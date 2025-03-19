@@ -401,54 +401,6 @@ def show_welcome_page():
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Admin area - Experiment data analysis (password protected)
-    st.markdown("---")
-    with st.expander("Experiment Data Analysis (Admin Only)"):
-        admin_password = st.text_input("Admin Password", type="password")
-        if admin_password == "admin123":  # Simple password example, use more secure authentication in actual applications
-            try:
-                # Read experiment data
-                experiment_df = pd.read_csv(DATA_FILE)
-                
-                if not experiment_df.empty:
-                    st.markdown("### Experiment Data Statistics")
-                    
-                    # Basic statistics
-                    st.markdown("#### Participant Statistics")
-                    group_counts = experiment_df['experiment_group'].value_counts()
-                    st.write(f"Total participants: {len(experiment_df)}")
-                    st.write(f"AI Customization Group: {group_counts.get('AI Customization Group', 0)} people")
-                    st.write(f"Preset Design Group: {group_counts.get('Preset Design Group', 0)} people")
-                    
-                    # Purchase intention comparison
-                    st.markdown("#### Purchase Intention Comparison")
-                    purchase_by_group = experiment_df.groupby('experiment_group')['purchase_intent'].mean()
-                    st.bar_chart(purchase_by_group)
-                    
-                    # Satisfaction comparison
-                    st.markdown("#### Satisfaction Comparison")
-                    satisfaction_by_group = experiment_df.groupby('experiment_group')['satisfaction_score'].mean()
-                    st.bar_chart(satisfaction_by_group)
-                    
-                    # Willing to pay price comparison
-                    st.markdown("#### Willing to Pay Price Comparison")
-                    price_by_group = experiment_df.groupby('experiment_group')['price_willing_to_pay'].mean()
-                    st.bar_chart(price_by_group)
-                    
-                    # Export data button
-                    st.download_button(
-                        label="Export Complete Data (CSV)",
-                        data=experiment_df.to_csv(index=False).encode('utf-8'),
-                        file_name="experiment_data_export.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info("No experiment data yet, please wait for user participation.")
-            except Exception as e:
-                st.error(f"Error loading or analyzing data: {e}")
-        elif admin_password:
-            st.error("Incorrect password, unable to access admin area.")
-
 # AI Customization Group design page
 def show_ai_design_page():
     st.title("👕 AI Co-Creation Experiment Platform")
