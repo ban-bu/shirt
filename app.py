@@ -678,7 +678,7 @@ def show_preset_design_page():
             pen_color = st.color_picker("选择画笔颜色", "#000000")
             pen_size = st.slider("画笔粗细", 1, 20, 5)
             
-            # 绘图画布 - 单列显示，没有实时预览
+            # 绘图画布
             canvas_result = st_canvas(
                 fill_color="rgba(255, 255, 255, 0.3)",  # 填充颜色
                 stroke_width=pen_size,  # 笔画宽度
@@ -697,8 +697,23 @@ def show_preset_design_page():
                     # 将numpy数组转换为PIL图像
                     drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
                     
-                    # 保存设计到会话状态
-                    st.session_state.generated_design = drawn_design
+                    # 创建一个新的透明背景图像
+                    transparent_design = Image.new("RGBA", drawn_design.size, (0, 0, 0, 0))
+                    
+                    # 处理图像，将白色背景变为透明
+                    width, height = drawn_design.size
+                    for x in range(width):
+                        for y in range(height):
+                            r, g, b, a = drawn_design.getpixel((x, y))
+                            # 如果像素接近白色，则设为完全透明
+                            if r > 240 and g > 240 and b > 240:
+                                transparent_design.putpixel((x, y), (0, 0, 0, 0))
+                            else:
+                                # 否则保留原始颜色和不透明度
+                                transparent_design.putpixel((x, y), (r, g, b, 255))
+                    
+                    # 保存处理后的设计到会话状态
+                    st.session_state.generated_design = transparent_design
                     
                     # 合成到原始图像
                     composite_image = st.session_state.base_image.copy()
@@ -708,13 +723,10 @@ def show_preset_design_page():
                     box_size = int(1024 * 0.25)
                     
                     # 缩放绘制的图案到选择区域大小
-                    scaled_design = drawn_design.resize((box_size, box_size), Image.LANCZOS)
+                    scaled_design = transparent_design.resize((box_size, box_size), Image.LANCZOS)
                     
-                    try:
-                        composite_image.paste(scaled_design, (left, top), scaled_design)
-                    except Exception as e:
-                        st.warning(f"透明通道粘贴失败，直接粘贴: {e}")
-                        composite_image.paste(scaled_design, (left, top))
+                    # 使用透明通道粘贴图像
+                    composite_image.paste(scaled_design, (left, top), scaled_design)
                     
                     # 保存最终设计
                     st.session_state.final_design = composite_image
