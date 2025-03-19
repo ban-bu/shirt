@@ -311,47 +311,13 @@ def show_welcome_page():
         This experiment aims to study the impact of AI Co-Creation on consumer purchasing behavior. You will have the opportunity to experience the T-shirt customization process and share your feedback.
         
         **Experiment Process**:
-        1. Fill in your basic information
-        2. Choose an experiment group
-        3. Complete T-shirt customization
-        4. Submit survey feedback
+        1. Choose an experiment group
+        2. Complete T-shirt customization
+        3. Submit survey feedback
         
         Your participation is crucial to our research. Thank you for your support!
         """)
         st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown("### Please fill in your basic information")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        age = st.number_input("Your age", min_value=18, max_value=80, value=25)
-        
-        gender = st.radio("Your gender", 
-                          options=["Male", "Female", "Other", "Prefer not to say"])
-    
-    with col2:
-        shopping_frequency = st.selectbox(
-            "How often do you purchase clothing?",
-            options=["Weekly", "Several times a month", "Quarterly", "Several times a year", "Rarely"]
-        )
-        
-        customize_experience = st.selectbox(
-            "Have you had any clothing customization experience before?",
-            options=["Extensive experience", "Some experience", "Little experience", "No experience"]
-        )
-    
-    ai_attitude = st.slider(
-        "What is your attitude toward artificial intelligence technology?",
-        min_value=1, max_value=10, value=5,
-        help="1 means very negative, 10 means very positive"
-    )
-    
-    uniqueness_importance = st.slider(
-        "How important is clothing uniqueness to you?",
-        min_value=1, max_value=10, value=5,
-        help="1 means not important at all, 10 means very important"
-    )
     
     st.markdown("### Please select the experiment group you want to participate in")
     
@@ -368,12 +334,12 @@ def show_welcome_page():
         if st.button("Choose AI Customization Group"):
             st.session_state.experiment_group = "AI Customization Group"
             st.session_state.user_info = {
-                'age': age,
-                'gender': gender,
-                'shopping_frequency': shopping_frequency,
-                'customize_experience': customize_experience,
-                'ai_attitude': ai_attitude,
-                'uniqueness_importance': uniqueness_importance
+                'age': 25,  # 默认值
+                'gender': "Male",  # 默认值
+                'shopping_frequency': "Weekly",  # 默认值
+                'customize_experience': "Some experience",  # 默认值
+                'ai_attitude': 5,  # 默认值
+                'uniqueness_importance': 5  # 默认值
             }
             st.session_state.page = "design"
             st.rerun()
@@ -390,16 +356,64 @@ def show_welcome_page():
         if st.button("Choose Preset Design Group"):
             st.session_state.experiment_group = "Preset Design Group"
             st.session_state.user_info = {
-                'age': age,
-                'gender': gender,
-                'shopping_frequency': shopping_frequency,
-                'customize_experience': customize_experience,
-                'ai_attitude': ai_attitude,
-                'uniqueness_importance': uniqueness_importance
+                'age': 25,  # 默认值
+                'gender': "Male",  # 默认值
+                'shopping_frequency': "Weekly",  # 默认值
+                'customize_experience': "Some experience",  # 默认值
+                'ai_attitude': 5,  # 默认值
+                'uniqueness_importance': 5  # 默认值
             }
             st.session_state.page = "design"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+
+    # Admin area - Experiment data analysis (password protected)
+    st.markdown("---")
+    with st.expander("Experiment Data Analysis (Admin Only)"):
+        admin_password = st.text_input("Admin Password", type="password")
+        if admin_password == "admin123":  # Simple password example, use more secure authentication in actual applications
+            try:
+                # Read experiment data
+                experiment_df = pd.read_csv(DATA_FILE)
+                
+                if not experiment_df.empty:
+                    st.markdown("### Experiment Data Statistics")
+                    
+                    # Basic statistics
+                    st.markdown("#### Participant Statistics")
+                    group_counts = experiment_df['experiment_group'].value_counts()
+                    st.write(f"Total participants: {len(experiment_df)}")
+                    st.write(f"AI Customization Group: {group_counts.get('AI Customization Group', 0)} people")
+                    st.write(f"Preset Design Group: {group_counts.get('Preset Design Group', 0)} people")
+                    
+                    # Purchase intention comparison
+                    st.markdown("#### Purchase Intention Comparison")
+                    purchase_by_group = experiment_df.groupby('experiment_group')['purchase_intent'].mean()
+                    st.bar_chart(purchase_by_group)
+                    
+                    # Satisfaction comparison
+                    st.markdown("#### Satisfaction Comparison")
+                    satisfaction_by_group = experiment_df.groupby('experiment_group')['satisfaction_score'].mean()
+                    st.bar_chart(satisfaction_by_group)
+                    
+                    # Willing to pay price comparison
+                    st.markdown("#### Willing to Pay Price Comparison")
+                    price_by_group = experiment_df.groupby('experiment_group')['price_willing_to_pay'].mean()
+                    st.bar_chart(price_by_group)
+                    
+                    # Export data button
+                    st.download_button(
+                        label="Export Complete Data (CSV)",
+                        data=experiment_df.to_csv(index=False).encode('utf-8'),
+                        file_name="experiment_data_export.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("No experiment data yet, please wait for user participation.")
+            except Exception as e:
+                st.error(f"Error loading or analyzing data: {e}")
+        elif admin_password:
+            st.error("Incorrect password, unable to access admin area.")
 
 # AI Customization Group design page
 def show_ai_design_page():
