@@ -746,62 +746,62 @@ def show_preset_design_page():
         
         else:  # "Draw your own design"
             st.markdown("## Draw Your Own Design")
-            st.markdown("在下方画布中绘制您的图案")
+            st.markdown("Draw your pattern on the canvas below")
             
-            pen_color = st.color_picker("选择画笔颜色", "#000000")
-            pen_size = st.slider("画笔粗细", 1, 20, 5)
+            pen_color = st.color_picker("Choose pen color", "#000000")
+            pen_size = st.slider("Pen thickness", 1, 20, 5)
             
-            # 绘图画布
+            # Drawing canvas
             canvas_result = st_canvas(
-                fill_color="rgba(255, 255, 255, 0.3)",  # 填充颜色
-                stroke_width=pen_size,  # 笔画宽度
-                stroke_color=pen_color,  # 笔画颜色
-                background_color="#ffffff",  # 背景颜色
+                fill_color="rgba(255, 255, 255, 0.3)",  # Fill color
+                stroke_width=pen_size,  # Stroke width
+                stroke_color=pen_color,  # Stroke color
+                background_color="#ffffff",  # Background color
                 height=400,
                 width=400,
-                drawing_mode="freedraw",  # 绘制模式
+                drawing_mode="freedraw",  # Drawing mode
                 key="canvas",
             )
 
-            # 检查是否有绘图
+            # Check if there is a drawing
             if canvas_result.image_data is not None:
-                # 应用到T恤的按钮
-                if st.button("将设计应用到T恤"):
-                    # 将numpy数组转换为PIL图像
+                # Button to apply to T-shirt
+                if st.button("Apply to T-shirt"):
+                    # Convert numpy array to PIL image
                     drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
                     
-                    # 创建一个新的透明背景图像
+                    # Create a new transparent background image
                     transparent_design = Image.new("RGBA", drawn_design.size, (0, 0, 0, 0))
                     
-                    # 处理图像，将白色背景变为透明
+                    # Process image, making white background transparent
                     width, height = drawn_design.size
                     for x in range(width):
                         for y in range(height):
                             r, g, b, a = drawn_design.getpixel((x, y))
-                            # 如果像素接近白色，则设为完全透明
+                            # If pixel is close to white, set it to fully transparent
                             if r > 240 and g > 240 and b > 240:
                                 transparent_design.putpixel((x, y), (0, 0, 0, 0))
                             else:
-                                # 否则保留原始颜色和不透明度
+                                # Otherwise keep original color and opacity
                                 transparent_design.putpixel((x, y), (r, g, b, 255))
                     
-                    # 保存处理后的设计到会话状态
+                    # Save processed design to session state
                     st.session_state.generated_design = transparent_design
                     
-                    # 合成到原始图像
+                    # Composite to original image
                     composite_image = st.session_state.base_image.copy()
                     
-                    # 放置设计到当前选择位置
+                    # Place design at current selection position
                     left, top = st.session_state.current_box_position
                     box_size = int(1024 * 0.25)
                     
-                    # 缩放绘制的图案到选择区域大小
+                    # Scale drawn pattern to selection area size
                     scaled_design = transparent_design.resize((box_size, box_size), Image.LANCZOS)
                     
-                    # 使用透明通道粘贴图像
+                    # Paste image using transparency channel
                     composite_image.paste(scaled_design, (left, top), scaled_design)
                     
-                    # 保存最终设计
+                    # Save final design
                     st.session_state.final_design = composite_image
                     st.rerun()
     
