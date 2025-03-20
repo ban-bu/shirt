@@ -596,6 +596,18 @@ def show_ai_design_page():
     # Display final effect - move out of col2, place at bottom of overall page
     if st.session_state.final_design is not None:
         st.markdown("### Final Result")
+        
+        # 添加清空设计按钮
+        if st.button("🗑️ Clear All Designs", key="clear_designs"):
+            # 清空所有设计相关的状态变量
+            st.session_state.generated_design = None
+            # 重置最终设计为基础T恤图像
+            st.session_state.final_design = None
+            # 重置当前图像为带选择框的基础图像
+            temp_image, _ = draw_selection_box(st.session_state.base_image, st.session_state.current_box_position)
+            st.session_state.current_image = temp_image
+            st.rerun()
+        
         st.image(st.session_state.final_design, use_container_width=True)
         
         # Provide download option
@@ -776,6 +788,19 @@ def show_preset_design_page():
     # Display final effect - maintain consistent layout with AI customization page
     if st.session_state.final_design is not None:
         st.markdown("### Final Result")
+        
+        # 添加清空设计按钮
+        if st.button("🗑️ Clear All Designs", key="clear_designs"):
+            # 清空所有设计相关的状态变量
+            st.session_state.preset_design = None
+            st.session_state.drawn_design = None
+            # 重置最终设计为基础T恤图像
+            st.session_state.final_design = None
+            # 重置当前图像为带选择框的基础图像
+            temp_image, _ = draw_selection_box(st.session_state.base_image, st.session_state.current_box_position)
+            st.session_state.current_image = temp_image
+            st.rerun()
+        
         st.image(st.session_state.final_design, use_container_width=True)
         
         # Provide download option
