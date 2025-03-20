@@ -630,7 +630,7 @@ def show_preset_design_page():
     st.title("👕 Preset Design Experiment Platform")
     st.markdown("### Preset Design Group - Choose Your Favorite T-shirt Design")
     
-    # Create two-column layout
+    # Create two-column layout for the main design area
     col1, col2 = st.columns([3, 2])
     
     with col1:
@@ -668,18 +668,13 @@ def show_preset_design_page():
             st.rerun()
 
     with col2:
-        st.markdown("## Choose Design Method")
+        st.markdown("## Design Methods")
         
-        # 添加设计方法选择
-        design_method = st.radio(
-            "How would you like to create your design?",
-            options=["Choose preset design", "Draw your own design"],
-            horizontal=True
-        )
+        # Create tabs for the two design methods
+        tab1, tab2 = st.tabs(["Choose preset design", "Draw your own design"])
         
-        if design_method == "Choose preset design":
-            # 原有预设设计的代码
-            st.markdown("## Choose Preset Design")
+        with tab1:
+            st.markdown("### Choose Preset Design")
             
             # Display preset design image options
             st.markdown("Select one from the designs below:")
@@ -718,7 +713,7 @@ def show_preset_design_page():
                         st.image(preset_design, caption=f"Preset Design: {selected_file}", use_container_width=True)
                         
                         # Apply design button
-                        if st.button("Apply to T-shirt"):
+                        if st.button("Apply to T-shirt", key="apply_preset"):
                             st.session_state.generated_design = preset_design
                             
                             # Composite on original image
@@ -738,14 +733,13 @@ def show_preset_design_page():
                                 st.warning(f"Transparent channel paste failed, direct paste: {e}")
                                 composite_image.paste(scaled_design, (left, top))
                             
-                            # 这两行应该在内部try-except块之后
                             st.session_state.final_design = composite_image
                             st.rerun()
                     except Exception as e:
                         st.error(f"Error processing preset design: {e}")
         
-        else:  # "Draw your own design"
-            st.markdown("## Draw Your Own Design")
+        with tab2:
+            st.markdown("### Draw Your Own Design")
             st.markdown("Draw your pattern on the canvas below")
             
             pen_color = st.color_picker("Choose pen color", "#000000")
@@ -766,7 +760,7 @@ def show_preset_design_page():
             # Check if there is a drawing
             if canvas_result.image_data is not None:
                 # Button to apply to T-shirt
-                if st.button("Apply to T-shirt"):
+                if st.button("Apply to T-shirt", key="apply_drawing"):
                     # Convert numpy array to PIL image
                     drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
                     
@@ -829,7 +823,7 @@ def show_preset_design_page():
                 st.session_state.page = "survey"
                 st.rerun()
 
-    # Return to main interface button - modified here
+    # Return to main interface button
     if st.button("Return to Main Page"):
         # Clear all design-related states
         st.session_state.base_image = None
