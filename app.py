@@ -630,25 +630,25 @@ def show_preset_design_page():
     st.title("👕 Preset Design Experiment Platform")
     st.markdown("### Preset Design Group - Choose Your Favorite T-shirt Design")
     
-    # Create layout for T-shirt display
-    col1, col2 = st.columns([3, 2])
+    # Load T-shirt base image first (before any columns)
+    if st.session_state.base_image is None:
+        try:
+            base_image = Image.open("white_shirt.png").convert("RGBA")
+            st.session_state.base_image = base_image
+            # Initialize by drawing selection box in the center
+            initial_image, initial_pos = draw_selection_box(base_image)
+            st.session_state.current_image = initial_image
+            st.session_state.current_box_position = initial_pos
+        except Exception as e:
+            st.error(f"Error loading white T-shirt image: {e}")
+            st.stop()
     
-    with col1:
+    # Create main column layout for the page
+    shirt_col, design_col = st.columns([3, 2])
+    
+    # T-shirt display area
+    with shirt_col:
         st.markdown("## Design Area")
-        
-        # Load T-shirt base image
-        if st.session_state.base_image is None:
-            try:
-                base_image = Image.open("white_shirt.png").convert("RGBA")
-                st.session_state.base_image = base_image
-                # Initialize by drawing selection box in the center
-                initial_image, initial_pos = draw_selection_box(base_image)
-                st.session_state.current_image = initial_image
-                st.session_state.current_box_position = initial_pos
-            except Exception as e:
-                st.error(f"Error loading white T-shirt image: {e}")
-                st.stop()
-        
         st.markdown("**👇 Click anywhere on the T-shirt to move the design frame**")
         
         # Display current image and get click coordinates
@@ -667,54 +667,55 @@ def show_preset_design_page():
             st.session_state.current_box_position = new_pos
             st.rerun()
     
-    # Create design options area - direct layout without tabs
-    st.markdown("## Design Methods")
-    
-    # Create two columns for the design methods
-    preset_col, draw_col = st.columns(2)
-    
-    with preset_col:
-        st.markdown("### Choose Preset Design")
+    # Design methods area
+    with design_col:
+        st.markdown("## Design Methods")
         
-        # Display preset design image options
-        st.markdown("Select one from the designs below:")
+        # Create tabs for the two design methods to save vertical space
+        tab1, tab2 = st.tabs(["Choose preset design", "Draw your own design"])
         
-        # Get all images from predesign folder
-        predesign_folder = "predesign"
-        design_files = []
-        
-        # Ensure folder exists
-        if not os.path.exists(predesign_folder):
-            st.error(f"Preset design folder not found: {predesign_folder}, please make sure it exists.")
-        else:
-            # Get all supported image files
-            for file in os.listdir(predesign_folder):
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    design_files.append(file)
-        
-        if not design_files:
-            st.warning(f"No image files found in the {predesign_folder} folder.")
-        else:
-            # Display image selection interface
-            selected_file = st.radio(
-                "Available designs",
-                options=design_files,
-                horizontal=True
-            )
+        # Preset designs tab
+        with tab1:
+            predesign_folder = "predesign"
+            design_files = []
             
-            st.session_state.selected_preset = selected_file
+            # Ensure folder exists
+            if not os.path.exists(predesign_folder):
+                st.error(f"Preset design folder not found: {predesign_folder}, please make sure it exists.")
+            else:
+                # Get all supported image files
+                for file in os.listdir(predesign_folder):
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                        design_files.append(file)
             
-            # Display selected design
-            if st.session_state.selected_preset:
-                try:
-                    # Load design image
-                    design_path = os.path.join(predesign_folder, selected_file)
-                    preset_design = Image.open(design_path).convert("RGBA")
-                    st.image(preset_design, caption=f"Preset Design: {selected_file}", use_container_width=True)
+            if not design_files:
+                st.warning(f"No image files found in the {predesign_folder} folder.")
+            else:
+                # Display image selection interface
+                selected_file = st.radio(
+                    "Available designs",
+                    options=design_files,
+                    horizontal=True
+                )
+                
+                if selected_file:
+                    # Store selected file in session state
+                    st.session_state.selected_preset = selected_file
                     
-                    # Apply design button
-                    if st.button("Apply Preset to T-shirt", key="apply_preset"):
-                        st.session_state.generated_design = preset_design
+                    try:
+                        # Load design image
+                        design_path = os.path.join(predesign_folder, selected_file)
+                        preset_design = Image.open(design_path).convert("RGBA")
+                        st.image(preset_design, caption=f"Preset Design: {selected_file}", use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error loading preset design: {e}")
+                
+                # Apply design button - moved outside the if condition
+                if st.button("Apply Preset to T-shirt", key="apply_preset") and st.session_state.selected_preset:
+                    try:
+                        # Load design image
+                        design_path = os.path.join(predesign_folder, st.session_state.selected_preset)
+                        preset_design = Image.open(design_path).convert("RGBA")
                         
                         # Composite on original image
                         composite_image = st.session_state.base_image.copy()
@@ -726,87 +727,87 @@ def show_preset_design_page():
                         # Scale preset pattern to selection area size
                         scaled_design = preset_design.resize((box_size, box_size), Image.LANCZOS)
                         
-                        try:
-                            # Ensure transparency channel is used for pasting
-                            composite_image.paste(scaled_design, (left, top), scaled_design)
-                        except Exception as e:
-                            st.warning(f"Transparent channel paste failed, direct paste: {e}")
-                            composite_image.paste(scaled_design, (left, top))
+                        # Ensure transparency channel is used for pasting
+                        composite_image.paste(scaled_design, (left, top), scaled_design)
                         
+                        # Save results to session state
+                        st.session_state.generated_design = preset_design
                         st.session_state.final_design = composite_image
-                        st.rerun()
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"Error applying preset design: {e}")
+        
+        # Drawing tab
+        with tab2:
+            # Drawing tools
+            pen_color = st.color_picker("Choose pen color", "#000000")
+            pen_size = st.slider("Pen thickness", 1, 20, 5)
+            
+            # Drawing canvas
+            canvas_result = st_canvas(
+                fill_color="rgba(255, 255, 255, 0.3)",
+                stroke_width=pen_size,
+                stroke_color=pen_color,
+                background_color="#ffffff",
+                height=350,
+                width=350,
+                drawing_mode="freedraw",
+                key="canvas",
+            )
+            
+            # Apply drawing button
+            if st.button("Apply Drawing to T-shirt", key="apply_drawing") and canvas_result.image_data is not None:
+                # Process the drawing
+                try:
+                    # Convert numpy array to PIL image
+                    drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
+                    
+                    # Create a new transparent background image
+                    transparent_design = Image.new("RGBA", drawn_design.size, (0, 0, 0, 0))
+                    
+                    # Process image, making white background transparent
+                    width, height = drawn_design.size
+                    for x in range(width):
+                        for y in range(height):
+                            r, g, b, a = drawn_design.getpixel((x, y))
+                            # If pixel is close to white, set it to fully transparent
+                            if r > 240 and g > 240 and b > 240:
+                                transparent_design.putpixel((x, y), (0, 0, 0, 0))
+                            else:
+                                # Otherwise keep original color and opacity
+                                transparent_design.putpixel((x, y), (r, g, b, 255))
+                    
+                    # Composite to original image
+                    composite_image = st.session_state.base_image.copy()
+                    
+                    # Place design at current selection position
+                    left, top = st.session_state.current_box_position
+                    box_size = int(1024 * 0.25)
+                    
+                    # Scale drawn pattern to selection area size
+                    scaled_design = transparent_design.resize((box_size, box_size), Image.LANCZOS)
+                    
+                    # Paste image using transparency channel
+                    composite_image.paste(scaled_design, (left, top), scaled_design)
+                    
+                    # Save to session state
+                    st.session_state.generated_design = transparent_design
+                    st.session_state.final_design = composite_image
+                    st.experimental_rerun()
                 except Exception as e:
-                    st.error(f"Error processing preset design: {e}")
+                    st.error(f"Error applying drawing: {e}")
     
-    with draw_col:
-        st.markdown("### Draw Your Own Design")
-        st.markdown("Draw your pattern on the canvas below")
-        
-        pen_color = st.color_picker("Choose pen color", "#000000")
-        pen_size = st.slider("Pen thickness", 1, 20, 5)
-        
-        # Drawing canvas
-        canvas_result = st_canvas(
-            fill_color="rgba(255, 255, 255, 0.3)",  # Fill color
-            stroke_width=pen_size,  # Stroke width
-            stroke_color=pen_color,  # Stroke color
-            background_color="#ffffff",  # Background color
-            height=350,
-            width=350,
-            drawing_mode="freedraw",  # Drawing mode
-            key="canvas",
-        )
-
-        # Check if there is a drawing
-        if canvas_result.image_data is not None:
-            # Button to apply to T-shirt
-            if st.button("Apply Drawing to T-shirt", key="apply_drawing"):
-                # Convert numpy array to PIL image
-                drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
-                
-                # Create a new transparent background image
-                transparent_design = Image.new("RGBA", drawn_design.size, (0, 0, 0, 0))
-                
-                # Process image, making white background transparent
-                width, height = drawn_design.size
-                for x in range(width):
-                    for y in range(height):
-                        r, g, b, a = drawn_design.getpixel((x, y))
-                        # If pixel is close to white, set it to fully transparent
-                        if r > 240 and g > 240 and b > 240:
-                            transparent_design.putpixel((x, y), (0, 0, 0, 0))
-                        else:
-                            # Otherwise keep original color and opacity
-                            transparent_design.putpixel((x, y), (r, g, b, 255))
-                
-                # Save processed design to session state
-                st.session_state.generated_design = transparent_design
-                
-                # Composite to original image
-                composite_image = st.session_state.base_image.copy()
-                
-                # Place design at current selection position
-                left, top = st.session_state.current_box_position
-                box_size = int(1024 * 0.25)
-                
-                # Scale drawn pattern to selection area size
-                scaled_design = transparent_design.resize((box_size, box_size), Image.LANCZOS)
-                
-                # Paste image using transparency channel
-                composite_image.paste(scaled_design, (left, top), scaled_design)
-                
-                # Save final design
-                st.session_state.final_design = composite_image
-                st.rerun()
-    
-    # Display final effect - maintain consistent layout with AI customization page
+    # Display final design (if available) - outside all columns to use full width
     if st.session_state.final_design is not None:
+        st.markdown("---")
         st.markdown("### Final Result")
         st.image(st.session_state.final_design, use_container_width=True)
         
-        # Provide download option
-        col1, col2 = st.columns(2)
-        with col1:
+        # Add action buttons in columns
+        action_col1, action_col2 = st.columns(2)
+        
+        with action_col1:
+            # Download button
             buf = BytesIO()
             st.session_state.final_design.save(buf, format="PNG")
             buf.seek(0)
@@ -817,12 +818,12 @@ def show_preset_design_page():
                 mime="image/png"
             )
         
-        with col2:
-            # Add confirm completion button that navigates to the survey page
+        with action_col2:
+            # Confirm button
             if st.button("Confirm Completion"):
                 st.session_state.page = "survey"
                 st.rerun()
-
+    
     # Return to main interface button
     if st.button("Return to Main Page"):
         # Clear all design-related states
@@ -831,7 +832,7 @@ def show_preset_design_page():
         st.session_state.current_box_position = None
         st.session_state.generated_design = None
         st.session_state.final_design = None
-        st.session_state.selected_preset = None  # Clear selected preset design
+        st.session_state.selected_preset = None
         # Only change page state, retain user info and experiment group
         st.session_state.page = "welcome"
         st.rerun()
