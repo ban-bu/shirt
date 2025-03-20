@@ -650,10 +650,10 @@ def show_preset_design_page():
     st.title("👕 Preset Design Experiment Platform")
     st.markdown("### Preset Design Group - Choose Your Favorite T-shirt Design")
     
-    # Create two-column layout
-    col1, col2 = st.columns([3, 2])
+    # 创建三列布局：左侧T恤区域，中间预设设计选择区域，右侧绘图区域
+    design_area_col, options_col, drawing_col = st.columns([2, 1, 1])
     
-    with col1:
+    with design_area_col:
         st.markdown("## Design Area")
         
         # Load T-shirt base image
@@ -687,12 +687,46 @@ def show_preset_design_page():
             st.session_state.current_box_position = new_pos
             st.rerun()
 
-    with col2:
-        st.markdown("## Design Options")
-        
-        # === 预设设计部分 ===
-        st.markdown("### Choose Preset Design")
-        st.markdown("Select one from the designs below:")
+        # 显示最终设计结果（如果有）
+        if st.session_state.final_design is not None:
+            st.markdown("### Final Result")
+            
+            # 添加清空设计按钮
+            if st.button("🗑️ Clear All Designs", key="clear_designs"):
+                # 清空所有设计相关的状态变量
+                st.session_state.preset_design = None
+                st.session_state.drawn_design = None
+                # 重置最终设计为基础T恤图像
+                st.session_state.final_design = None
+                # 重置当前图像为带选择框的基础图像
+                temp_image, _ = draw_selection_box(st.session_state.base_image, st.session_state.current_box_position)
+                st.session_state.current_image = temp_image
+                st.rerun()
+            
+            st.image(st.session_state.final_design, use_container_width=True)
+            
+            # Provide download and completion options
+            download_col, complete_col = st.columns(2)
+            with download_col:
+                buf = BytesIO()
+                st.session_state.final_design.save(buf, format="PNG")
+                buf.seek(0)
+                st.download_button(
+                    label="💾 Download Custom Design",
+                    data=buf,
+                    file_name="custom_tshirt.png",
+                    mime="image/png"
+                )
+            
+            with complete_col:
+                # Add confirm completion button that navigates to the survey page
+                if st.button("Confirm Completion"):
+                    st.session_state.page = "survey"
+                    st.rerun()
+
+    # 预设设计选择区域
+    with options_col:
+        st.markdown("## Preset Design")
         
         # Get all images from predesign folder
         predesign_folder = "predesign"
@@ -712,9 +746,9 @@ def show_preset_design_page():
         else:
             # Display image selection interface
             selected_file = st.radio(
-                "Available designs",
+                "Select a design:",
                 options=design_files,
-                horizontal=True
+                horizontal=False
             )
             
             st.session_state.selected_preset = selected_file
@@ -725,7 +759,7 @@ def show_preset_design_page():
                     # Load design image
                     design_path = os.path.join(predesign_folder, selected_file)
                     preset_design = Image.open(design_path).convert("RGBA")
-                    st.image(preset_design, caption=f"Preset Design: {selected_file}", use_container_width=True)
+                    st.image(preset_design, caption=f"Preset: {selected_file}", use_column_width=True)
                     
                     # Apply design button
                     if st.button("Apply Preset to T-shirt", key="apply_preset"):
@@ -738,44 +772,44 @@ def show_preset_design_page():
                 except Exception as e:
                     st.error(f"Error processing preset design: {e}")
         
-        # 在应用设计按钮后，添加位置和缩放控制（注意位置）
-        # 如果已有预设设计，显示位置控制
+        # 位置和缩放控制（当有预设设计时）
         if st.session_state.preset_design is not None:
-            st.markdown("### Adjust Preset Design")
+            st.markdown("### Adjust Preset")
             
             # 添加缩放滑块
-            scale_percent = st.slider("Design Size", 10, 100, st.session_state.preset_scale, 5, 
-                                     help="Size of the design as percentage of the frame size")
+            scale_percent = st.slider("Size", 10, 100, st.session_state.preset_scale, 5, 
+                                     help="Size of the design")
             
             # 设置水平和垂直位置的滑块
-            col_pos1, col_pos2 = st.columns(2)
-            with col_pos1:
-                x_offset = st.slider("Horizontal Position", -100, 100, st.session_state.preset_position[0], 5, 
-                                   help="Move design left (-) or right (+)")
-            with col_pos2:
-                y_offset = st.slider("Vertical Position", -100, 100, st.session_state.preset_position[1], 5,
-                                   help="Move design up (-) or down (+)")
+            x_offset = st.slider("Horizontal", -100, 100, st.session_state.preset_position[0], 5, 
+                               help="Move left/right")
+            y_offset = st.slider("Vertical", -100, 100, st.session_state.preset_position[1], 5,
+                               help="Move up/down")
             
-            # 当控制值改变时，更新会话状态
+            # 实时预览
             if (x_offset, y_offset) != st.session_state.preset_position or scale_percent != st.session_state.preset_scale:
+                # 更新会话状态
                 st.session_state.preset_position = (x_offset, y_offset)
                 st.session_state.preset_scale = scale_percent
                 
-                # 更新设计，但不自动重新运行页面
-                update_composite_image()
+                # 创建实时预览
+                preview_image = st.session_state.base_image.copy()
+                update_composite_image(preview_only=True)
                 
-                # 添加应用位置按钮
-                if st.button("Apply Position and Size", key="apply_position"):
+                # 显示预览
+                st.image(preview_image, caption="Preview", use_column_width=True)
+                
+                # 应用按钮
+                if st.button("Apply Position", key="apply_position"):
+                    update_composite_image()
                     st.rerun()
+
+    # 绘图区域
+    with drawing_col:
+        st.markdown("## Draw Design")
+        st.markdown("Create your own pattern:")
         
-        # 分隔线
-        st.markdown("---")
-        
-        # === 绘制设计部分 ===
-        st.markdown("### Draw Your Own Design")
-        st.markdown("Draw your pattern on the canvas below")
-        
-        pen_color = st.color_picker("Choose pen color", "#000000")
+        pen_color = st.color_picker("Pen color", "#000000")
         pen_size = st.slider("Pen thickness", 1, 20, 5)
         
         # Drawing canvas
@@ -784,8 +818,8 @@ def show_preset_design_page():
             stroke_width=pen_size,  # Stroke width
             stroke_color=pen_color,  # Stroke color
             background_color="#ffffff",  # Background color
-            height=400,
-            width=400,
+            height=300,
+            width=300,
             drawing_mode="freedraw",  # Drawing mode
             key="canvas",
         )
@@ -818,61 +852,29 @@ def show_preset_design_page():
                 # 生成复合图像
                 update_composite_image()
                 st.rerun()
-    
-    # Display final effect - maintain consistent layout with AI customization page
-    if st.session_state.final_design is not None:
-        st.markdown("### Final Result")
-        
-        # 添加清空设计按钮
-        if st.button("🗑️ Clear All Designs", key="clear_designs"):
-            # 清空所有设计相关的状态变量
-            st.session_state.preset_design = None
-            st.session_state.drawn_design = None
-            # 重置最终设计为基础T恤图像
-            st.session_state.final_design = None
-            # 重置当前图像为带选择框的基础图像
-            temp_image, _ = draw_selection_box(st.session_state.base_image, st.session_state.current_box_position)
-            st.session_state.current_image = temp_image
-            st.rerun()
-        
-        st.image(st.session_state.final_design, use_container_width=True)
-        
-        # Provide download option
-        col1, col2 = st.columns(2)
-        with col1:
-            buf = BytesIO()
-            st.session_state.final_design.save(buf, format="PNG")
-            buf.seek(0)
-            st.download_button(
-                label="💾 Download Custom Design",
-                data=buf,
-                file_name="custom_tshirt.png",
-                mime="image/png"
-            )
-        
-        with col2:
-            # Add confirm completion button that navigates to the survey page
-            if st.button("Confirm Completion"):
-                st.session_state.page = "survey"
+            
+            if st.button("Clear Canvas", key="clear_canvas"):
+                # 不做任何操作，因为canvas会在页面刷新时自动清空
                 st.rerun()
 
-    # Return to main interface button - modified here
-    if st.button("Return to Main Page"):
+    # Return to main interface button 
+    st.sidebar.markdown("## Navigation")
+    if st.sidebar.button("Return to Main Page"):
         # Clear all design-related states
         st.session_state.base_image = None
         st.session_state.current_image = None
         st.session_state.current_box_position = None
         st.session_state.generated_design = None
-        st.session_state.preset_design = None  # 清除预设设计
-        st.session_state.drawn_design = None   # 清除绘制设计
+        st.session_state.preset_design = None
+        st.session_state.drawn_design = None
         st.session_state.final_design = None
         st.session_state.selected_preset = None
         # Only change page state, retain user info and experiment group
         st.session_state.page = "welcome"
         st.rerun()
 
-# 添加新函数用于更新复合图像
-def update_composite_image():
+# 修改更新复合图像函数，添加预览选项
+def update_composite_image(preview_only=False):
     """更新复合图像，同时显示预设设计和用户绘制的设计"""
     # 创建基础图像的副本
     composite_image = st.session_state.base_image.copy()
@@ -922,8 +924,11 @@ def update_composite_image():
             st.warning(f"Transparent channel paste failed for drawn design: {e}")
             composite_image.paste(drawn_scaled, (left, top))
     
-    # 保存最终设计
-    st.session_state.final_design = composite_image
+    # 如果不是仅预览，则保存最终设计
+    if not preview_only:
+        st.session_state.final_design = composite_image
+    
+    return composite_image
 
 # Survey page
 def show_survey_page():
