@@ -671,10 +671,20 @@ def show_preset_design_page():
         
         st.markdown("**👇 Click anywhere on the T-shirt to move the design frame**")
         
+        # 准备显示的图像（带有预览效果）
+        display_image = st.session_state.current_image
+        
+        # 如果有预设设计且正在调整位置，显示绿色预览框
+        if st.session_state.preset_design is not None and 'adjusting_preset' in st.session_state and st.session_state.adjusting_preset:
+            # 在当前图像上绘制绿色预览框
+            display_image = draw_preview_box(display_image, 
+                                           st.session_state.current_box_position,
+                                           st.session_state.preset_position,
+                                           st.session_state.preset_scale)
+        
         # Display current image and get click coordinates
-        current_image = st.session_state.current_image
         coordinates = streamlit_image_coordinates(
-            current_image,
+            display_image,
             key="shirt_image"
         )
         
@@ -696,6 +706,7 @@ def show_preset_design_page():
                 # 清空所有设计相关的状态变量
                 st.session_state.preset_design = None
                 st.session_state.drawn_design = None
+                st.session_state.adjusting_preset = False
                 # 重置最终设计为基础T恤图像
                 st.session_state.final_design = None
                 # 重置当前图像为带选择框的基础图像
@@ -765,6 +776,8 @@ def show_preset_design_page():
                     if st.button("Apply Preset to T-shirt", key="apply_preset"):
                         # 存储预设设计到专用状态变量
                         st.session_state.preset_design = preset_design
+                        # 初始化调整状态
+                        st.session_state.adjusting_preset = False
                         
                         # 生成复合图像
                         update_composite_image()
@@ -786,23 +799,25 @@ def show_preset_design_page():
             y_offset = st.slider("Vertical", -100, 100, st.session_state.preset_position[1], 5,
                                help="Move up/down")
             
-            # 实时预览
+            # 当控制值改变时，设置为调整模式
             if (x_offset, y_offset) != st.session_state.preset_position or scale_percent != st.session_state.preset_scale:
                 # 更新会话状态
                 st.session_state.preset_position = (x_offset, y_offset)
                 st.session_state.preset_scale = scale_percent
-                
-                # 创建实时预览
-                preview_image = st.session_state.base_image.copy()
-                update_composite_image(preview_only=True)
-                
-                # 显示预览
-                st.image(preview_image, caption="Preview", use_column_width=True)
+                st.session_state.adjusting_preset = True
                 
                 # 应用按钮
                 if st.button("Apply Position", key="apply_position"):
+                    # 关闭调整模式
+                    st.session_state.adjusting_preset = False
+                    # 应用设计
                     update_composite_image()
                     st.rerun()
+            
+            # 取消按钮
+            if st.button("Cancel Adjustment", key="cancel_adjustment"):
+                st.session_state.adjusting_preset = False
+                st.rerun()
 
     # 绘图区域
     with drawing_col:
@@ -869,11 +884,76 @@ def show_preset_design_page():
         st.session_state.drawn_design = None
         st.session_state.final_design = None
         st.session_state.selected_preset = None
+        st.session_state.adjusting_preset = False
         # Only change page state, retain user info and experiment group
         st.session_state.page = "welcome"
         st.rerun()
 
-# 修改更新复合图像函数，添加预览选项
+# 添加绘制预览框的函数
+def draw_preview_box(image, box_position, preset_position, preset_scale):
+    """在当前图像上绘制绿色预览框，显示预设设计的位置和大小"""
+    # 创建图像副本
+    img_copy = image.copy()
+    draw = ImageDraw.Draw(img_copy)
+    
+    # 获取红框位置和大小
+    box_size = int(1024 * 0.25)
+    left, top = box_position
+    
+    # 计算预览框的位置和大小
+    x_offset, y_offset = preset_position
+    scale_percent = preset_scale
+    
+    # 计算缩放后的大小
+    scaled_size = int(box_size * scale_percent / 100)
+    
+    # 计算可移动的范围
+    max_offset = box_size - scaled_size
+    # 将-100到100范围映射到实际的像素偏移
+    actual_x_offset = int((x_offset / 100) * (max_offset / 2))
+    actual_y_offset = int((y_offset / 100) * (max_offset / 2))
+    
+    # 计算预览框的左上角坐标
+    preview_left = left + (box_size - scaled_size) // 2 + actual_x_offset
+    preview_top = top + (box_size - scaled_size) // 2 + actual_y_offset
+    
+    # 确保位置在红框范围内
+    preview_left = max(left, min(preview_left, left + box_size - scaled_size))
+    preview_top = max(top, min(preview_top, top + box_size - scaled_size))
+    
+    # 计算右下角坐标
+    preview_right = preview_left + scaled_size
+    preview_bottom = preview_top + scaled_size
+    
+    # 绘制绿色预览框
+    draw.rectangle(
+        [(preview_left, preview_top), (preview_right, preview_bottom)],
+        outline=(0, 255, 0),  # 绿色
+        width=2
+    )
+    
+    # 创建半透明填充
+    overlay = Image.new('RGBA', img_copy.size, (0, 0, 0, 0))
+    draw_overlay = ImageDraw.Draw(overlay)
+    
+    # 绘制半透明绿色填充
+    draw_overlay.rectangle(
+        [(preview_left, preview_top), (preview_right, preview_bottom)],
+        fill=(0, 255, 0, 30)  # 淡绿色半透明
+    )
+    
+    # 确保图像是RGBA模式
+    if img_copy.mode != 'RGBA':
+        img_copy = img_copy.convert('RGBA')
+    
+    # 合成图像
+    try:
+        return Image.alpha_composite(img_copy, overlay)
+    except Exception as e:
+        st.warning(f"Image composition failed: {e}")
+        return img_copy
+
+# 修改更新复合图像函数
 def update_composite_image(preview_only=False):
     """更新复合图像，同时显示预设设计和用户绘制的设计"""
     # 创建基础图像的副本
