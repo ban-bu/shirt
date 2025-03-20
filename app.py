@@ -306,6 +306,8 @@ if 'preset_design' not in st.session_state:
     st.session_state.preset_design = None
 if 'drawn_design' not in st.session_state:
     st.session_state.drawn_design = None
+if 'preset_position' not in st.session_state:
+    st.session_state.preset_position = (0, 0)  # 默认居中，表示相对红框左上角的偏移
 
 # Ensure data file exists
 initialize_experiment_data()
@@ -847,12 +849,37 @@ def update_composite_image():
     
     # 如果有预设设计，先应用预设设计
     if st.session_state.preset_design is not None:
-        preset_scaled = st.session_state.preset_design.resize((box_size, box_size), Image.LANCZOS)
+        # 获取位置偏移
+        x_offset, y_offset = getattr(st.session_state, 'preset_position', (0, 0))
+        scale_percent = getattr(st.session_state, 'preset_scale', 40)
+        
+        # 计算缩放大小 - 相对于选择框的百分比
+        scaled_size = int(box_size * scale_percent / 100)
+        
+        # 根据偏移量计算具体位置
+        # 计算可移动的范围，以确保图像不会完全移出框
+        max_offset = box_size - scaled_size
+        # 将-100到100范围映射到实际的像素偏移
+        actual_x_offset = int((x_offset / 100) * (max_offset / 2))
+        actual_y_offset = int((y_offset / 100) * (max_offset / 2))
+        
+        # 最终位置
+        paste_x = left + (box_size - scaled_size) // 2 + actual_x_offset
+        paste_y = top + (box_size - scaled_size) // 2 + actual_y_offset
+        
+        # 确保位置在合理范围内
+        paste_x = max(left, min(paste_x, left + box_size - scaled_size))
+        paste_y = max(top, min(paste_y, top + box_size - scaled_size))
+        
+        # 缩放预设图案
+        preset_scaled = st.session_state.preset_design.resize((scaled_size, scaled_size), Image.LANCZOS)
+        
         try:
-            composite_image.paste(preset_scaled, (left, top), preset_scaled)
+            # 在计算的位置粘贴图像
+            composite_image.paste(preset_scaled, (paste_x, paste_y), preset_scaled)
         except Exception as e:
             st.warning(f"Transparent channel paste failed for preset design: {e}")
-            composite_image.paste(preset_scaled, (left, top))
+            composite_image.paste(preset_scaled, (paste_x, paste_y))
     
     # 如果有用户绘制的设计，再应用用户绘制的设计（确保在顶层）
     if st.session_state.drawn_design is not None:
