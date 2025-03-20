@@ -302,6 +302,10 @@ if 'user_info' not in st.session_state:
     st.session_state.user_info = {}
 if 'selected_preset' not in st.session_state:
     st.session_state.selected_preset = None
+if 'preset_design' not in st.session_state:
+    st.session_state.preset_design = None
+if 'drawn_design' not in st.session_state:
+    st.session_state.drawn_design = None
 
 # Ensure data file exists
 initialize_experiment_data()
@@ -670,8 +674,6 @@ def show_preset_design_page():
     with col2:
         st.markdown("## Design Options")
         
-        # 移除选择设计方法的单选按钮，同时显示两个功能
-        
         # === 预设设计部分 ===
         st.markdown("### Choose Preset Design")
         st.markdown("Select one from the designs below:")
@@ -711,26 +713,11 @@ def show_preset_design_page():
                     
                     # Apply design button
                     if st.button("Apply Preset to T-shirt", key="apply_preset"):
-                        st.session_state.generated_design = preset_design
+                        # 存储预设设计到专用状态变量
+                        st.session_state.preset_design = preset_design
                         
-                        # Composite on original image
-                        composite_image = st.session_state.base_image.copy()
-                        
-                        # Place design at current selection position
-                        left, top = st.session_state.current_box_position
-                        box_size = int(1024 * 0.25)
-                        
-                        # Scale preset pattern to selection area size
-                        scaled_design = preset_design.resize((box_size, box_size), Image.LANCZOS)
-                        
-                        try:
-                            # Ensure transparency channel is used for pasting
-                            composite_image.paste(scaled_design, (left, top), scaled_design)
-                        except Exception as e:
-                            st.warning(f"Transparent channel paste failed, direct paste: {e}")
-                            composite_image.paste(scaled_design, (left, top))
-                        
-                        st.session_state.final_design = composite_image
+                        # 生成复合图像
+                        update_composite_image()
                         st.rerun()
                 except Exception as e:
                     st.error(f"Error processing preset design: {e}")
@@ -779,24 +766,11 @@ def show_preset_design_page():
                             # Otherwise keep original color and opacity
                             transparent_design.putpixel((x, y), (r, g, b, 255))
                 
-                # Save processed design to session state
-                st.session_state.generated_design = transparent_design
+                # 存储绘制的设计到专用状态变量
+                st.session_state.drawn_design = transparent_design
                 
-                # Composite to original image
-                composite_image = st.session_state.base_image.copy()
-                
-                # Place design at current selection position
-                left, top = st.session_state.current_box_position
-                box_size = int(1024 * 0.25)
-                
-                # Scale drawn pattern to selection area size
-                scaled_design = transparent_design.resize((box_size, box_size), Image.LANCZOS)
-                
-                # Paste image using transparency channel
-                composite_image.paste(scaled_design, (left, top), scaled_design)
-                
-                # Save final design
-                st.session_state.final_design = composite_image
+                # 生成复合图像
+                update_composite_image()
                 st.rerun()
     
     # Display final effect - maintain consistent layout with AI customization page
@@ -830,11 +804,42 @@ def show_preset_design_page():
         st.session_state.current_image = None
         st.session_state.current_box_position = None
         st.session_state.generated_design = None
+        st.session_state.preset_design = None  # 清除预设设计
+        st.session_state.drawn_design = None   # 清除绘制设计
         st.session_state.final_design = None
-        st.session_state.selected_preset = None  # Clear selected preset design
+        st.session_state.selected_preset = None
         # Only change page state, retain user info and experiment group
         st.session_state.page = "welcome"
         st.rerun()
+
+# 添加新函数用于更新复合图像
+def update_composite_image():
+    """更新复合图像，同时显示预设设计和用户绘制的设计"""
+    # 创建基础图像的副本
+    composite_image = st.session_state.base_image.copy()
+    box_size = int(1024 * 0.25)
+    left, top = st.session_state.current_box_position
+    
+    # 如果有预设设计，先应用预设设计
+    if st.session_state.preset_design is not None:
+        preset_scaled = st.session_state.preset_design.resize((box_size, box_size), Image.LANCZOS)
+        try:
+            composite_image.paste(preset_scaled, (left, top), preset_scaled)
+        except Exception as e:
+            st.warning(f"Transparent channel paste failed for preset design: {e}")
+            composite_image.paste(preset_scaled, (left, top))
+    
+    # 如果有用户绘制的设计，再应用用户绘制的设计（确保在顶层）
+    if st.session_state.drawn_design is not None:
+        drawn_scaled = st.session_state.drawn_design.resize((box_size, box_size), Image.LANCZOS)
+        try:
+            composite_image.paste(drawn_scaled, (left, top), drawn_scaled)
+        except Exception as e:
+            st.warning(f"Transparent channel paste failed for drawn design: {e}")
+            composite_image.paste(drawn_scaled, (left, top))
+    
+    # 保存最终设计
+    st.session_state.final_design = composite_image
 
 # Survey page
 def show_survey_page():
