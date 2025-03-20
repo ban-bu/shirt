@@ -379,7 +379,6 @@ def show_welcome_page():
             }
             st.session_state.page = "design"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # Admin area - Experiment data analysis (password protected)
     st.markdown("---")
@@ -715,7 +714,12 @@ def show_preset_design_page():
             # 添加清空设计按钮 - 修复红框位置偏移问题
             if st.button("🗑️ Clear All Designs", key="clear_designs"):
                 # 保存当前红框位置
-                current_pos = st.session_state.current_box_position
+                current_left, current_top = st.session_state.current_box_position
+                box_size = int(1024 * 0.25)
+                
+                # 计算红框中心点坐标
+                center_x = current_left + box_size // 2
+                center_y = current_top + box_size // 2
                 
                 # 清空所有设计相关的状态变量
                 st.session_state.preset_design = None
@@ -724,10 +728,9 @@ def show_preset_design_page():
                 # 重置最终设计为基础T恤图像
                 st.session_state.final_design = None
                 
-                # 重置当前图像为带选择框的基础图像，保持原来的位置
-                temp_image, new_pos = draw_selection_box(st.session_state.base_image, current_pos)
+                # 使用中心点坐标重新绘制选择框
+                temp_image, new_pos = draw_selection_box(st.session_state.base_image, (center_x, center_y))
                 st.session_state.current_image = temp_image
-                # 确保保持相同的位置
                 st.session_state.current_box_position = new_pos
                 st.rerun()
             
