@@ -308,6 +308,8 @@ if 'drawn_design' not in st.session_state:
     st.session_state.drawn_design = None
 if 'preset_position' not in st.session_state:
     st.session_state.preset_position = (0, 0)  # 默认居中，表示相对红框左上角的偏移
+if 'preset_scale' not in st.session_state:
+    st.session_state.preset_scale = 40  # 默认为40%
 
 # Ensure data file exists
 initialize_experiment_data()
@@ -735,6 +737,36 @@ def show_preset_design_page():
                         st.rerun()
                 except Exception as e:
                     st.error(f"Error processing preset design: {e}")
+        
+        # 在应用设计按钮后，添加位置和缩放控制（注意位置）
+        # 如果已有预设设计，显示位置控制
+        if st.session_state.preset_design is not None:
+            st.markdown("### Adjust Preset Design")
+            
+            # 添加缩放滑块
+            scale_percent = st.slider("Design Size", 10, 100, st.session_state.preset_scale, 5, 
+                                     help="Size of the design as percentage of the frame size")
+            
+            # 设置水平和垂直位置的滑块
+            col_pos1, col_pos2 = st.columns(2)
+            with col_pos1:
+                x_offset = st.slider("Horizontal Position", -100, 100, st.session_state.preset_position[0], 5, 
+                                   help="Move design left (-) or right (+)")
+            with col_pos2:
+                y_offset = st.slider("Vertical Position", -100, 100, st.session_state.preset_position[1], 5,
+                                   help="Move design up (-) or down (+)")
+            
+            # 当控制值改变时，更新会话状态
+            if (x_offset, y_offset) != st.session_state.preset_position or scale_percent != st.session_state.preset_scale:
+                st.session_state.preset_position = (x_offset, y_offset)
+                st.session_state.preset_scale = scale_percent
+                
+                # 更新设计，但不自动重新运行页面
+                update_composite_image()
+                
+                # 添加应用位置按钮
+                if st.button("Apply Position and Size", key="apply_position"):
+                    st.rerun()
         
         # 分隔线
         st.markdown("---")
