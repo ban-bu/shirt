@@ -310,6 +310,8 @@ if 'preset_position' not in st.session_state:
     st.session_state.preset_position = (0, 0)  # 默认居中，表示相对红框左上角的偏移
 if 'preset_scale' not in st.session_state:
     st.session_state.preset_scale = 40  # 默认为40%
+if 'design_mode' not in st.session_state:
+    st.session_state.design_mode = "preset"  # 默认使用预设设计模式
 
 # Ensure data file exists
 initialize_experiment_data()
@@ -713,7 +715,7 @@ def show_preset_design_page():
         if st.session_state.final_design is not None:
             st.markdown("### Final Result")
             
-            # 添加清空设计按钮 - 修复红框位置偏移问题
+            # 修改清空设计按钮
             if st.button("🗑️ Clear All Designs", key="clear_designs"):
                 # 保存当前红框位置
                 current_left, current_top = st.session_state.current_box_position
@@ -727,6 +729,8 @@ def show_preset_design_page():
                 st.session_state.preset_design = None
                 st.session_state.drawn_design = None
                 st.session_state.temp_preset_design = None
+                st.session_state.preset_position = (0, 0)
+                st.session_state.preset_scale = 40
                 # 重置最终设计为基础T恤图像
                 st.session_state.final_design = None
                 
@@ -842,6 +846,9 @@ def show_preset_design_page():
                             st.session_state.preset_position = st.session_state.temp_preset_position
                             st.session_state.preset_scale = st.session_state.temp_preset_scale
                             
+                            # 清除绘制的设计，确保只显示一种设计
+                            st.session_state.drawn_design = None
+                            
                             # 生成复合图像
                             update_composite_image()
                             st.rerun()
@@ -891,6 +898,11 @@ def show_preset_design_page():
                     
                     # 存储绘制的设计到专用状态变量
                     st.session_state.drawn_design = transparent_design
+                    
+                    # 清除预设设计，确保只显示一种设计
+                    st.session_state.preset_design = None
+                    st.session_state.preset_position = (0, 0)
+                    st.session_state.preset_scale = 40
                     
                     # 生成复合图像
                     update_composite_image()
@@ -981,14 +993,15 @@ def draw_design_preview(image, design, box_position, design_position, design_sca
 
 # 修改更新复合图像函数
 def update_composite_image(preview_only=False):
-    """更新复合图像，同时显示预设设计和用户绘制的设计"""
+    """更新复合图像，显示单种设计（只使用预设设计或绘制设计）"""
     # 创建基础图像的副本
     composite_image = st.session_state.base_image.copy()
     box_size = int(1024 * 0.25)
     left, top = st.session_state.current_box_position
     
-    # 如果有预设设计，先应用预设设计
-    if st.session_state.preset_design is not None:
+    # 根据设计模式决定显示哪种设计
+    if st.session_state.design_mode == "preset" and st.session_state.preset_design is not None:
+        # 只显示预设设计
         # 获取位置偏移
         x_offset, y_offset = getattr(st.session_state, 'preset_position', (0, 0))
         scale_percent = getattr(st.session_state, 'preset_scale', 40)
@@ -1021,8 +1034,8 @@ def update_composite_image(preview_only=False):
             st.warning(f"Transparent channel paste failed for preset design: {e}")
             composite_image.paste(preset_scaled, (paste_x, paste_y))
     
-    # 如果有用户绘制的设计，再应用用户绘制的设计（确保在顶层）
-    if st.session_state.drawn_design is not None:
+    elif st.session_state.design_mode == "draw" and st.session_state.drawn_design is not None:
+        # 只显示绘制的设计
         drawn_scaled = st.session_state.drawn_design.resize((box_size, box_size), Image.LANCZOS)
         try:
             composite_image.paste(drawn_scaled, (left, top), drawn_scaled)
