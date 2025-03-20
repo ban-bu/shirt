@@ -649,8 +649,8 @@ def show_preset_design_page():
     st.title("👕 Preset Design Experiment Platform")
     st.markdown("### Preset Design Group - Choose Your Favorite T-shirt Design")
     
-    # 创建三列布局：左侧T恤区域，中间预设设计选择区域，右侧绘图区域
-    design_area_col, options_col, drawing_col = st.columns([2, 1, 1])
+    # 创建两列布局：左侧T恤区域，右侧设计选择区域
+    design_area_col, options_col = st.columns([3, 2])
     
     with design_area_col:
         st.markdown("## Design Area")
@@ -677,12 +677,14 @@ def show_preset_design_page():
             st.session_state.temp_preset_position = (0, 0)
         if 'temp_preset_scale' not in st.session_state:
             st.session_state.temp_preset_scale = 40
+        if 'design_mode' not in st.session_state:
+            st.session_state.design_mode = "preset"  # 默认使用预设设计模式
             
         # 准备显示的图像（带有预览效果）
         display_image = st.session_state.current_image.copy()
         
         # 如果有临时预设设计且正在调整位置，直接在红框中显示预览
-        if st.session_state.temp_preset_design is not None:
+        if st.session_state.temp_preset_design is not None and st.session_state.design_mode == "preset":
             # 在当前图像上绘制预览
             display_image = draw_design_preview(
                 display_image,
@@ -755,133 +757,151 @@ def show_preset_design_page():
                     st.session_state.page = "survey"
                     st.rerun()
 
-    # 预设设计选择区域
+    # 设计选择区域
     with options_col:
-        st.markdown("## Preset Design")
+        st.markdown("## Design Options")
         
-        # Get all images from predesign folder
-        predesign_folder = "predesign"
-        design_files = []
-        
-        # Ensure folder exists
-        if not os.path.exists(predesign_folder):
-            st.error(f"Preset design folder not found: {predesign_folder}, please make sure it exists.")
-        else:
-            # Get all supported image files
-            for file in os.listdir(predesign_folder):
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    design_files.append(file)
-        
-        if not design_files:
-            st.warning(f"No image files found in the {predesign_folder} folder.")
-        else:
-            # Display image selection interface
-            selected_file = st.radio(
-                "Select a design:",
-                options=design_files,
-                horizontal=False
-            )
-            
-            st.session_state.selected_preset = selected_file
-            
-            # Display selected design
-            if st.session_state.selected_preset:
-                try:
-                    # 加载选定的设计图像
-                    design_path = os.path.join(predesign_folder, selected_file)
-                    selected_design = Image.open(design_path).convert("RGBA")
-                    st.image(selected_design, caption=f"Preset: {selected_file}", use_column_width=True)
-                    
-                    # 加载到临时设计变量，准备实时预览调整
-                    st.session_state.temp_preset_design = selected_design
-                    
-                    # 调整位置和大小控件
-                    st.markdown("### Adjust Position & Size")
-                    
-                    # 添加缩放滑块
-                    scale_percent = st.slider("Size", 10, 100, st.session_state.temp_preset_scale, 5, 
-                                             help="Size of the design")
-                    
-                    # 设置水平和垂直位置的滑块
-                    x_offset = st.slider("Horizontal", -100, 100, st.session_state.temp_preset_position[0], 5, 
-                                       help="Move left/right")
-                    y_offset = st.slider("Vertical", -100, 100, st.session_state.temp_preset_position[1], 5,
-                                       help="Move up/down")
-                    
-                    # 当控制值改变时更新临时状态
-                    if (x_offset, y_offset) != st.session_state.temp_preset_position or scale_percent != st.session_state.temp_preset_scale:
-                        st.session_state.temp_preset_position = (x_offset, y_offset)
-                        st.session_state.temp_preset_scale = scale_percent
-                        st.rerun()  # 触发重新运行以更新预览
-                    
-                    # 应用设计按钮
-                    if st.button("Apply to T-shirt", key="apply_preset"):
-                        # 将临时设计和位置应用到实际设计
-                        st.session_state.preset_design = st.session_state.temp_preset_design
-                        st.session_state.preset_position = st.session_state.temp_preset_position
-                        st.session_state.preset_scale = st.session_state.temp_preset_scale
-                        
-                        # 生成复合图像
-                        update_composite_image()
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Error processing preset design: {e}")
-
-    # 绘图区域
-    with drawing_col:
-        st.markdown("## Draw Design")
-        st.markdown("Create your own pattern:")
-        
-        pen_color = st.color_picker("Pen color", "#000000")
-        pen_size = st.slider("Pen thickness", 1, 20, 5)
-        
-        # Drawing canvas
-        canvas_result = st_canvas(
-            fill_color="rgba(255, 255, 255, 0.3)",  # Fill color
-            stroke_width=pen_size,  # Stroke width
-            stroke_color=pen_color,  # Stroke color
-            background_color="#ffffff",  # Background color
-            height=300,
-            width=300,
-            drawing_mode="freedraw",  # Drawing mode
-            key="canvas",
+        # 添加设计模式选择
+        design_mode = st.radio(
+            "Choose design method:",
+            options=["Use preset design", "Draw your own design"],
+            horizontal=True,
+            index=0 if st.session_state.design_mode == "preset" else 1
         )
-
-        # Check if there is a drawing
-        if canvas_result.image_data is not None:
-            # Button to apply to T-shirt
-            if st.button("Apply Drawing to T-shirt", key="apply_drawing"):
-                # Convert numpy array to PIL image
-                drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
-                
-                # Create a new transparent background image
-                transparent_design = Image.new("RGBA", drawn_design.size, (0, 0, 0, 0))
-                
-                # Process image, making white background transparent
-                width, height = drawn_design.size
-                for x in range(width):
-                    for y in range(height):
-                        r, g, b, a = drawn_design.getpixel((x, y))
-                        # If pixel is close to white, set it to fully transparent
-                        if r > 240 and g > 240 and b > 240:
-                            transparent_design.putpixel((x, y), (0, 0, 0, 0))
-                        else:
-                            # Otherwise keep original color and opacity
-                            transparent_design.putpixel((x, y), (r, g, b, 255))
-                
-                # 存储绘制的设计到专用状态变量
-                st.session_state.drawn_design = transparent_design
-                
-                # 生成复合图像
-                update_composite_image()
-                st.rerun()
+        
+        # 更新设计模式
+        if (design_mode == "Use preset design" and st.session_state.design_mode != "preset") or \
+           (design_mode == "Draw your own design" and st.session_state.design_mode != "draw"):
+            st.session_state.design_mode = "preset" if design_mode == "Use preset design" else "draw"
+            st.rerun()
+        
+        # 根据当前设计模式显示相应的界面
+        if st.session_state.design_mode == "preset":
+            # 预设设计选择界面
+            st.markdown("## Preset Design Selection")
             
-            if st.button("Clear Canvas", key="clear_canvas"):
-                # 不做任何操作，因为canvas会在页面刷新时自动清空
-                st.rerun()
+            # Get all images from predesign folder
+            predesign_folder = "predesign"
+            design_files = []
+            
+            # Ensure folder exists
+            if not os.path.exists(predesign_folder):
+                st.error(f"Preset design folder not found: {predesign_folder}, please make sure it exists.")
+            else:
+                # Get all supported image files
+                for file in os.listdir(predesign_folder):
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                        design_files.append(file)
+            
+            if not design_files:
+                st.warning(f"No image files found in the {predesign_folder} folder.")
+            else:
+                # Display image selection interface
+                selected_file = st.radio(
+                    "Select a design:",
+                    options=design_files,
+                    horizontal=False
+                )
+                
+                st.session_state.selected_preset = selected_file
+                
+                # Display selected design
+                if st.session_state.selected_preset:
+                    try:
+                        # 加载选定的设计图像
+                        design_path = os.path.join(predesign_folder, selected_file)
+                        selected_design = Image.open(design_path).convert("RGBA")
+                        st.image(selected_design, caption=f"Preset: {selected_file}", use_column_width=True)
+                        
+                        # 加载到临时设计变量，准备实时预览调整
+                        st.session_state.temp_preset_design = selected_design
+                        
+                        # 调整位置和大小控件
+                        st.markdown("### Adjust Position & Size")
+                        
+                        # 添加缩放滑块
+                        scale_percent = st.slider("Size", 10, 100, st.session_state.temp_preset_scale, 5, 
+                                                 help="Size of the design")
+                        
+                        # 设置水平和垂直位置的滑块
+                        x_offset = st.slider("Horizontal", -100, 100, st.session_state.temp_preset_position[0], 5, 
+                                           help="Move left/right")
+                        y_offset = st.slider("Vertical", -100, 100, st.session_state.temp_preset_position[1], 5,
+                                           help="Move up/down")
+                        
+                        # 当控制值改变时更新临时状态
+                        if (x_offset, y_offset) != st.session_state.temp_preset_position or scale_percent != st.session_state.temp_preset_scale:
+                            st.session_state.temp_preset_position = (x_offset, y_offset)
+                            st.session_state.temp_preset_scale = scale_percent
+                            st.rerun()  # 触发重新运行以更新预览
+                        
+                        # 应用设计按钮
+                        if st.button("Apply to T-shirt", key="apply_preset"):
+                            # 将临时设计和位置应用到实际设计
+                            st.session_state.preset_design = st.session_state.temp_preset_design
+                            st.session_state.preset_position = st.session_state.temp_preset_position
+                            st.session_state.preset_scale = st.session_state.temp_preset_scale
+                            
+                            # 生成复合图像
+                            update_composite_image()
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error processing preset design: {e}")
+        else:
+            # 绘图设计界面
+            st.markdown("## Draw Your Own Design")
+            st.markdown("Create your own pattern:")
+            
+            pen_color = st.color_picker("Pen color", "#000000")
+            pen_size = st.slider("Pen thickness", 1, 20, 5)
+            
+            # Drawing canvas
+            canvas_result = st_canvas(
+                fill_color="rgba(255, 255, 255, 0.3)",  # Fill color
+                stroke_width=pen_size,  # Stroke width
+                stroke_color=pen_color,  # Stroke color
+                background_color="#ffffff",  # Background color
+                height=300,
+                width=300,
+                drawing_mode="freedraw",  # Drawing mode
+                key="canvas",
+            )
 
-    # 删除侧边栏中的返回按钮，并将其移至页面底部
-    st.markdown("---")  # 添加分隔线
+            # Check if there is a drawing
+            if canvas_result.image_data is not None:
+                # Button to apply to T-shirt
+                if st.button("Apply Drawing to T-shirt", key="apply_drawing"):
+                    # Convert numpy array to PIL image
+                    drawn_design = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
+                    
+                    # Create a new transparent background image
+                    transparent_design = Image.new("RGBA", drawn_design.size, (0, 0, 0, 0))
+                    
+                    # Process image, making white background transparent
+                    width, height = drawn_design.size
+                    for x in range(width):
+                        for y in range(height):
+                            r, g, b, a = drawn_design.getpixel((x, y))
+                            # If pixel is close to white, set it to fully transparent
+                            if r > 240 and g > 240 and b > 240:
+                                transparent_design.putpixel((x, y), (0, 0, 0, 0))
+                            else:
+                                # Otherwise keep original color and opacity
+                                transparent_design.putpixel((x, y), (r, g, b, 255))
+                    
+                    # 存储绘制的设计到专用状态变量
+                    st.session_state.drawn_design = transparent_design
+                    
+                    # 生成复合图像
+                    update_composite_image()
+                    st.rerun()
+                
+                if st.button("Clear Canvas", key="clear_canvas"):
+                    # 不做任何操作，因为canvas会在页面刷新时自动清空
+                    st.rerun()
+
+    # 添加分隔线
+    st.markdown("---")
     
     # Return to main interface button - 现在放在页面底部
     if st.button("Return to Main Page", key="return_to_main_page"):
@@ -895,6 +915,7 @@ def show_preset_design_page():
         st.session_state.final_design = None
         st.session_state.selected_preset = None
         st.session_state.temp_preset_design = None
+        st.session_state.design_mode = "preset"  # 重置设计模式为默认值
         # Only change page state, retain user info and experiment group
         st.session_state.page = "welcome"
         st.rerun()
