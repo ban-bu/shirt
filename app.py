@@ -880,9 +880,11 @@ def show_preset_design_page():
                 # 不做任何操作，因为canvas会在页面刷新时自动清空
                 st.rerun()
 
-    # Return to main interface button 
-    st.sidebar.markdown("## Navigation")
-    if st.sidebar.button("Return to Main Page"):
+    # 删除侧边栏中的返回按钮，并将其移至页面底部
+    st.markdown("---")  # 添加分隔线
+    
+    # Return to main interface button - 现在放在页面底部
+    if st.button("Return to Main Page", key="return_to_main_page"):
         # Clear all design-related states
         st.session_state.base_image = None
         st.session_state.current_image = None
