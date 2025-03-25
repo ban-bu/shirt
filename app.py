@@ -559,11 +559,11 @@ def show_ai_design_page():
             else:
                 # Generate more professional and detailed prompt text
                 prompt_text = (
-                    f"Design a T-shirt pattern with '{theme}' theme using {style}. "
+                    f"Design a pattern with '{theme}' theme using {style}. "
                     f"Use the following colors: {colors}. "
                     f"Design details: {details}. "
                     f"Design complexity is {complexity}/10 with {detail_level} level of detail. "
-                    f"The pattern should have an attractive, balanced composition suitable for a T-shirt print. "
+                    f"The pattern should have an attractive, balanced composition suitable for clothing print. "
                     f"Create a PNG format image with transparent background, ensuring only the design elements are visible with no background. "
                     f"The design style should be professional and modern, appropriate for clothing prints. "
                     f"Ensure the pattern has crisp edges and a high-quality appearance. "
